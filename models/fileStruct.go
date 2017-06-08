@@ -1,10 +1,14 @@
 package models
 
+import (
+	"reflect"
+	"strings"
+)
 
 type FileStrt struct {
 	FileHead     string
 	FileHeadInfo FileHeadInfo
-	//FileHeadInfo
+
 	FileBody     string
 	FileBodys    []Body
 }
@@ -49,28 +53,28 @@ func (fs *FileStrt) Init() {
 }
 
 func (fs FileStrt) HToString() string {
-	return fs.FileHeadInfo.INS_ID_CD + "," + fs.FileHeadInfo.Stlm_date + "," + fs.FileHeadInfo.TrnSucCount + "," + fs.FileHeadInfo.TrnSucAm + "," + fs.FileHeadInfo.TrnFeeT + "," + fs.FileHeadInfo.TrnReconT
+	t := reflect.TypeOf(fs.FileHeadInfo)
+	v := reflect.ValueOf(fs.FileHeadInfo)
+	strs := []string{}
+	for i := 0; i < t.NumField(); i++ {
+		strs = append(strs, v.Field(i).String())
+	}
+	s := strings.Join(strs, ",")
+	return s
 }
 
 func (by Body) BToString() string {
-	return by.MCHT_CD + ","		 +
-	by.TRANS_DATE + "," +
-	by.TRANS_TIME + "," +
-	by.STLM_DATE + "," +
-	by.TERM_ID + "," +
-	by.TRANS_KIND + "," +
-	by.KEY_RSP + "," +
-	by.PAN + "," +
-	by.CARD_KIND_DIS + "," +
-	by.TRANS_AMT + "," +
-	by.TRUE_FEE_MOD + "," +
-	by.MCHT_SET_AMT + "," +
-	by.ERR_FEE_IN + "," +
-	by.ERR_FEE_OUT + "," +
-	by.SYS_ID + "," +
-	by.INS_IN + "," +
-	by.INS_REAL_IN + "," +
-	by.INS_OUT + "," +
-	by.PROXY_CD + "," +
-	by.MEMBER_ID
+	t := reflect.TypeOf(by)
+	v := reflect.ValueOf(by)
+	strs := []string{}
+	for i := 0; i < t.NumField(); i++ {
+		//fmt.Printf("%s---%v \n", t.Field(i).Name,v.Field(i).Interface())
+		//str = append(str, v.Field(i).Interface().(string))
+		strs = append(strs, v.Field(i).String())
+
+	}
+
+	s := strings.Join(strs, ",")
+
+	return s
 }

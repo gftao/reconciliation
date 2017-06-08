@@ -29,10 +29,6 @@ type CrtFile struct {
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 }
 
-type InsIdCd struct {
-	Ins_id_cd string
-}
-
 func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IError {
 	cf.FileName = "C_"
 	cf.FilePath = config.StringDefault("filePath", "./")
@@ -52,9 +48,10 @@ func (cf *CrtFile) Run() {
 			return
 		}
 		fp := cf.geneFile()
-		fmt.Println(fp)
-		f, err := os.Create(fp)
+		fmt.Printf("对账文件路径：%s\n", fp)
 
+		f, err := os.Create(fp)
+		defer f.Close()
 		if err != nil {
 			fmt.Println(cf.FileName, err)
 			return
@@ -72,29 +69,20 @@ func (cf *CrtFile) Run() {
 
 		w.WriteString(cf.FileStrt.FileBody)//文件体 标识
 		w.WriteString("\r\n")
-
 		for _, tc := range cf.FileStrt.FileBodys {
-			tcStr := tc.BToString()
-			//if tc.INS_ID_CD == "62510000" {
-			//	fmt.Printf("%v\n",tc)
-			//}
-			w.WriteString(tcStr)
+			Str := tc.BToString()
+			w.WriteString(Str)
 			w.WriteString("\r\n")
-			//w.Flush()
 		}
-
 		w.Flush()
 		f.Sync()
-		f.Close()
 	}
 
 	return
 }
+
 func (cf *CrtFile) Finish() {
 	return
-}
-func (cf *CrtFile) StoreReconc() {
-
 }
 
 func (cf *CrtFile) ReadDate() {
@@ -103,11 +91,11 @@ func (cf *CrtFile) ReadDate() {
 	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE INS_ID_CD = ? and STLM_DATE = ?", cf.InsIdCd, cf.STLM_DATE).Rows() // (*sql.Rows, error)
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		fmt.Printf("dbc.Raw fail:", err)
+		fmt.Printf("dbc.Raw fail:%s\n", err)
 		return
 	}
 	if err != nil {
-		fmt.Printf("dbc.Raw fail:", err)
+		fmt.Printf("dbc.Raw fail:%s\n", err)
 		return
 	}
 	cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
@@ -123,14 +111,13 @@ func (cf *CrtFile) ReadDate() {
 		a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
 		f, _ := strconv.ParseFloat(tc.TRUE_FEE_MOD, 64)
 		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
-		fmt.Println(a, f, m)
+		//fmt.Println(a, f, m)
 		trans_amt_T += a
 		true_fee_mod_T += f
 		trnrecont_T += m
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
-		fmt.Println(a, f, m)
 	}
-	fmt.Println(trans_amt_T, true_fee_mod_T, trnrecont_T)
+	//fmt.Println(trans_amt_T, true_fee_mod_T, trnrecont_T)
 	//处理文件头
 	cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.InsIdCd
 	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
@@ -153,7 +140,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 		dbc := gormdb.GetInstance()
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tl).Error
 		if err != nil {
-			fmt.Printf("saveDatatoFStru db find failed:",err)
+			fmt.Printf("dbc find failed:%s\n",err)
 			//return
 		}
 
@@ -174,16 +161,15 @@ func (cf *CrtFile) saveDatatoFStru() {
 		if strings.EqualFold(tl.PROD_CD, "1151"){
 			b.SYS_ID        = tl.INDUSTRY_ADDN_INF
 		} else {
-			b.SYS_ID        = tl.INDUSTRY_ADDN_INF
+			b.SYS_ID        = tl.RETRI_REF_NO
 		}
-
-		b.SYS_ID        = tl.RETRI_REF_NO
 		b.INS_IN        = "0"
 		b.INS_REAL_IN   = "0"
 		b.INS_OUT       = "0"
 		b.PROXY_CD      = "0"
+		b.MEMBER_ID     = "0"
 
-		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys,b)
+		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 }
 
@@ -201,52 +187,31 @@ func (cf *CrtFile) GetInsIdCd() (string, bool) {
 }
 
 func (cf *CrtFile) geneFile() string {
-	inscd, ok := cf.GetInsIdCd()
+	cd, ok := cf.GetInsIdCd()
 	if ok {
-		cf.FileName = "C_"
-		cf.FileName = cf.FileName + inscd
+		cf.FileName =  "C_" + cd
 	} else {
 		return ""
 	}
 
 	cf.FileName = cf.FileName + "_" + cf.STLM_DATE + ".txt"
 	fmt.Printf("生成对账文件名称：%s\n", cf.FileName)
-
-	return cf.FilePath + cf.FileName
+	p := cf.FilePath + cf.FileName
+	return p
 }
 
 func (cf *CrtFile) InitInsIdCd() {
 
 	dbc := gormdb.GetInstance()
-	//rows, err := dbc.DB().Query("select nextval('INS_ID_CD')from " + tl.TableName())
-	//rows, err := dbc.Select("distinct INS_ID_CD").Find(&tl).Rows()
-	//rows, err := dbc.Table(tl.TableName()).Select("INS_ID_CD").Rows()
-	//dbc.Find(&tl, "INS_ID_CD = ?", "62510000")
-	/*
-	dbc = gormdb.GetInstance()
-	tc := models.Tbl_clear_txn{}
-	//err := dbc.Where(" key_rsp = ? ", "20160815155530959915").Find(&tc).Error
-	err := dbc.First(&tc).Error
-
-	if err == gorm.ErrRecordNotFound {
-		fmt.Printf("dbc.where fail:",err)
-		return
-	}
-	if err != nil{
-		fmt.Printf("dbc.where fail:",err)
-		return
-	}
-	fmt.Printf("tl:%v\n",tc)
-	*/
 
 	rows, err := dbc.Raw("SELECT distinct INS_ID_CD FROM tbl_ins_reconciliation").Rows() // (*sql.Rows, error)
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		fmt.Printf("dbc.Raw fail:", err)
+		fmt.Printf("dbc.Raw fail:%s\n", err)
 		return
 	}
 	if err != nil {
-		fmt.Printf("dbc.Raw fail:", err)
+		fmt.Printf("dbc.Raw fail:%s\n", err)
 		return
 	}
 

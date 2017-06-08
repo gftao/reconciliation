@@ -1,11 +1,11 @@
 package main
 
 import (
-	"golib/modules/gormdb"
 	"fmt"
-	"prodPmpCld/global"
 	"golib/modules/config"
+	"golib/modules/gormdb"
 	"golib/modules/run"
+	"prodPmpCld/global"
 
 	"Reconciliation/reconc"
 	//"runtime"
@@ -25,8 +25,8 @@ var g_taskList []TaskList = []TaskList{
 func main() {
 
 	args := os.Args //获取用户输入的所有参数
-	if args == nil || len(args) < 2{
-		fmt.Println("请带一个日期参数")
+	if args == nil || len(args) < 2 || len(args[1]) != 8 {
+		fmt.Println(`请带一个格式为: [20161119]的查询日期参数！`)
 		return
 	}
 

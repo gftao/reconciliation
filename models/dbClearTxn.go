@@ -1,10 +1,8 @@
 package models
 
-import "fmt"
-
 type Tbl_clear_txn struct {
 	COMPANY_CD          string `gorm:"column:COMPANY_CD"`
-	INS_ID_CD           string `gorm:"column:INS_ID_CD"` //机构号
+	INS_ID_CD           string `gorm:"column:INS_ID_CD"`       //机构号
 	ACQ_INS_ID_CD       string `gorm:"column:ACQ_INS_ID_CD"`
 	FWD_INS_ID_CD       string `gorm:"column:FWD_INS_ID_CD"`
 	MCHT_CD             string `gorm:"column:MCHT_CD"`         //商户号
@@ -112,11 +110,4 @@ type Tbl_clear_txn struct {
 
 func (t Tbl_clear_txn) TableName() string {
 	return "tbl_clear_txn"
-}
-//,交易日期,交易时间,,,,交易流水号,,,,,交易结算资金,应收差错费用0,应付差错费用0,系统流水号INDUSTRY_ADDN_INF(扫码)RETRI_REF_NO(收单),机构基准收入0,机构实际收入0,机构营销返佣0,代理编码0,会员号0
-
-func (t Tbl_clear_txn) ToString() string {
-	//商户号,交易日期,交易时间,清算日期,终端编号,交易类型,交易流水号,交易卡号,卡类型,交易本金,交易手续费,交易结算资金,应收差错费用,应付差错费用,系统流水号,机构基准收入,机构实际收入,机构营销返佣,代理编码,会员号
-	//return  t.MCHT_CD+ "," +t.TRANS_DATE_TIME+ ","+t.STLM_DATE+ "\n"
-	return fmt.Sprintf("%v", t)
 }
