@@ -1,0 +1,24 @@
+<component name="libraryTable">
+  <library name="GOPATH &lt;Reconciliation&gt;">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/../prodPmp" />
+      <root url="file://D:/go/src/golib" />
+      <root url="file://$PROJECT_DIR$/../MchtRegPlat" />
+      <root url="file://$PROJECT_DIR$/../prodPmpCld" />
+      <root url="file://D:/go/src/gopkg.in" />
+      <root url="file://D:/go/src/github.com" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../prodPmp" />
+      <root url="file://D:/go/src/golib" />
+      <root url="file://$PROJECT_DIR$/../MchtRegPlat" />
+      <root url="file://$PROJECT_DIR$/../prodPmpCld" />
+      <root url="file://D:/go/src/gopkg.in" />
+      <root url="file://D:/go/src/github.com" />
+    </SOURCES>
+    <excluded>
+      <root url="file://$PROJECT_DIR$" />
+    </excluded>
+  </library>
+</component>
