@@ -13,8 +13,6 @@ import (
 	"golib/modules/config"
 	"bufio"
 	"strconv"
-
-	"strings"
 )
 
 type CrtFile struct {
@@ -111,7 +109,7 @@ func (cf *CrtFile) ReadDate() {
 		a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
 		f, _ := strconv.ParseFloat(tc.TRUE_FEE_MOD, 64)
 		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
-		//fmt.Println(a, f, m)
+
 		trans_amt_T += a
 		true_fee_mod_T += f
 		trnrecont_T += m
@@ -158,9 +156,10 @@ func (cf *CrtFile) saveDatatoFStru() {
 		b.MCHT_SET_AMT  = tc.MCHT_SET_AMT
 		b.ERR_FEE_IN    = "0"
 		b.ERR_FEE_OUT	= "0"
-		if strings.EqualFold(tl.PROD_CD, "1151"){
+		fmt.Printf("prod_cd:%s\n", tl.PROD_CD)
+		if tl.PROD_CD == "1151"{
 			b.SYS_ID        = tl.INDUSTRY_ADDN_INF
-		} else {
+		} else if tl.PROD_CD == "1130" {
 			b.SYS_ID        = tl.RETRI_REF_NO
 		}
 		b.INS_IN        = "0"

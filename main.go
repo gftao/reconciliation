@@ -52,7 +52,7 @@ func main() {
 			fmt.Println("初始化失败: ", task.Name, err)
 			return
 		}
-		fmt.Println(task.Name + "初始化成功")
+		//fmt.Println(task.Name + "初始化成功")
 	}
 
 	for _, task := range g_taskList {

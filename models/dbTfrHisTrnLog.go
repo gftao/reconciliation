@@ -128,6 +128,6 @@ type Tbl_tfr_his_trn_log struct {
 	MSG_RESV_FLD9             string `gorm:"column:MSG_RESV_FLD9"`
 }
 
-func (t Tbl_tfr_his_trn_log) TableName() string {
+func (t *Tbl_tfr_his_trn_log) TableName() string {
 	return "tbl_tfr_his_trn_log"
 }

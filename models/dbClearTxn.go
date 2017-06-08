@@ -108,6 +108,6 @@ type Tbl_clear_txn struct {
 	REMARK5             string `gorm:"column:REMARK5"`
 }
 
-func (t Tbl_clear_txn) TableName() string {
+func (t *Tbl_clear_txn) TableName() string {
 	return "tbl_clear_txn"
 }
