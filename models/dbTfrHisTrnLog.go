@@ -5,7 +5,7 @@ type Tbl_tfr_his_trn_log struct {
 	TRANS_MT                  string `gorm:"column:TRANS_MT"`	//交易时间
 	SRC_QID                   string `gorm:"column:SRC_QID"`
 	DES_QID                   string `gorm:"column:DES_QID"`
-	MA_TRANS_CD               string `gorm:"column:MA_TRANS_CD"`
+	MA_TRANS_CD               string `gorm:"column:MA_TRANS_CD"` //
 	MA_TRANS_NM               string `gorm:"column:MA_TRANS_NM"`
 	KEY_RSP                   string `gorm:"column:KEY_RSP"`
 	KEY_REVSAL                string `gorm:"column:KEY_REVSAL"`
@@ -39,7 +39,7 @@ type Tbl_tfr_his_trn_log struct {
 	RETRI_REF_NO              string `gorm:"column:RETRI_REF_NO"`
 	REQ_AUTH_ID               string `gorm:"column:REQ_AUTH_ID"`
 	TRANS_SUBCATA             string `gorm:"column:TRANS_SUBCATA"`
-	INDUSTRY_ADDN_INF         string `gorm:"column:INDUSTRY_ADDN_INF"`
+	INDUSTRY_ADDN_INF         string `gorm:"column:INDUSTRY_ADDN_INF"`//产品平台订单号
 	TRANS_CURR_CD             string `gorm:"column:TRANS_CURR_CD"`
 	SEC_CTRL_INF              string `gorm:"column:SEC_CTRL_INF"`
 	IC_DATA                   string `gorm:"column:IC_DATA"`
@@ -83,7 +83,7 @@ type Tbl_tfr_his_trn_log struct {
 	TRANS_DT_TM_CONV          string `gorm:"column:TRANS_DT_TM_CONV"`
 	TRANS_SEQ_CONV            string `gorm:"column:TRANS_SEQ_CONV"`
 	MCHNT_TP_CONV             string `gorm:"column:MCHNT_TP_CONV"`
-	RETRI_REF_NO_CONV         string `gorm:"column:RETRI_REF_NO_CONV"`
+	RETRI_REF_NO_CONV         string `gorm:"column:RETRI_REF_NO_CONV"`//订单号的后12位
 	ACPT_INS_ID_CD_CONV       string `gorm:"column:ACPT_INS_ID_CD_CONV"`
 	TERM_ID_CONV              string `gorm:"column:TERM_ID_CONV"`
 	MCHNT_CD_CONV             string `gorm:"column:MCHNT_CD_CONV"`

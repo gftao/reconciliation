@@ -37,18 +37,26 @@ type Body struct {
 	MCHT_SET_AMT  string //交易结算资金
 	ERR_FEE_IN    string //应收差错费用 0
 	ERR_FEE_OUT   string //应付差错费用 0
-			     //机构上送订单号
 	SYS_ID        string //系统流水号  INDUSTRY_ADDN_INF(扫码)RETRI_REF_NO(收单)
 	INS_IN        string //机构基准收入 0
 	INS_REAL_IN   string //机构实际收入 0
 	INS_OUT       string //机构营销返佣 0
 	PROXY_CD      string //代理编码 0
 	MEMBER_ID     string //会员号 0
+
+	DUES          string //应付费用
+	PROD_CD       string //产品码
+	TRAND_CD      string //交易码
+	BIZ_CD        string //业务码
+	CUST_ORDER_ID string //第三方订单号//机构上送订单号
 }
 
 func (fs *FileStrt) Init() {
 	fs.FileHead = "机构代码,清算日期,交易总笔数,清算金额,清算手续费,结算总金额"
-	fs.FileBody = "商户号,交易日期,交易时间,清算日期,终端编号,交易类型,交易流水号,交易卡号,卡类型,交易本金,交易手续费,交易结算资金,应收差错费用,应付差错费用,系统流水号,机构基准收入,机构实际收入,机构营销返佣,代理编码,会员号"
+	fs.FileBody = "商户号,交易日期,交易时间,清算日期,终端编号,交易类型,交易流水号," +
+		"交易卡号,卡类型,交易本金,交易手续费,交易结算资金,应收差错费用,应付差错费用," +
+		"系统流水号,机构基准收入,机构实际收入,机构营销返佣,代理编码,会员号," +
+		"应付费用,产品码,交易码,业务码,第三方订单号"
 
 }
 

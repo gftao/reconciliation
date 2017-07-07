@@ -1,0 +1,40 @@
+{
+  "env_keys": {
+    "run_env": "RUN_MODE"
+  },
+  "loggers": [
+    {
+      "name": "default",
+      "config": {
+        "prod": {
+          "out": {
+              "name" : "null"
+          },
+          "level": "error"
+        },
+        "dev": {
+          "out": {
+              "name" : "null"
+          },
+          "level": "debug",
+          "formatter": {
+          },
+          "hooks": [
+            {
+              "name": "myfile",
+              "options": {
+                "filename": "./log/htdRec.log",
+                "maxlines": "0",
+                "maxsize": "800000",
+                "daily": true,
+                "maxdays": 30,
+                "rotate": true,
+                "level": 4
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

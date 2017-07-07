@@ -5,21 +5,24 @@ import (
 	"golib/modules/run"
 	"golib/modules/gormdb"
 	"prodPmpCld/utils/sutil"
-	"fmt"
-
 	"github.com/jinzhu/gorm"
 	"os"
-	"Reconciliation/models"
+	"htdRec/models"
 	"golib/modules/config"
 	"bufio"
 	"strconv"
+	"htdRec/myfstp"
+	"bytes"
+	"strings"
+
+	"golib/modules/logr"
 )
 
 type CrtFile struct {
 	FileName             string                     //对账文件名
 	FilePath             string                     //路径
 	SysDate              string                     //当前时间
-	InsIdCd              string                     //当前机构号
+	MCHT_CD              string                     //当前机构号
 	STLM_DATE            string                     //清算日期
 	Ins_id_cd            []string                   //全部机构号
 	FileStrt             models.FileStrt            //文件结构
@@ -29,13 +32,14 @@ type CrtFile struct {
 
 func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IError {
 	cf.FileName = "C_"
-	cf.FilePath = config.StringDefault("filePath", "./")
+	cf.FilePath = config.StringDefault("filePath", ".")
 	cf.SysDate = sutil.GetSysDate()//今天
 	cf.FileStrt = models.FileStrt{}
 	cf.STLM_DATE = chainName        //清算日期
 
 	cf.FileStrt.Init()
-	cf.InitInsIdCd()//查表取机构号
+	//查表获取需要生产队长文件机构的机构号,新增加的表
+	cf.InitInsIdCd()
 
 	return nil
 }
@@ -45,38 +49,92 @@ func (cf *CrtFile) Run() {
 		if len(cf.Ins_id_cd) == 0 {
 			return
 		}
-		fp := cf.geneFile()
-		fmt.Printf("对账文件路径：%s\n", fp)
-
-		f, err := os.Create(fp)
-		defer f.Close()
-		if err != nil {
-			fmt.Println(cf.FileName, err)
-			return
-		}
-
-		//读数据
-		cf.ReadDate()
-
-		w := bufio.NewWriter(f)  //创建新的 Writer 对象
-		//fmt.Printf("头标识：%s\n",cf.FileStrt.FileHead)
-		w.WriteString(cf.FileStrt.FileHead)        //文件头 标识
-		w.WriteString("\r\n")
-		w.WriteString(cf.FileStrt.HToString())
-		w.WriteString("\r\n")
-
-		w.WriteString(cf.FileStrt.FileBody)//文件体 标识
-		w.WriteString("\r\n")
-		for _, tc := range cf.FileStrt.FileBodys {
-			Str := tc.BToString()
-			w.WriteString(Str)
-			w.WriteString("\r\n")
-		}
-		w.Flush()
-		f.Sync()
+		cf.SaveToFile()
 	}
 
 	return
+}
+func (cf *CrtFile) SaveToFile() {
+	fp := cf.geneFile()
+	logr.Info("对账文件路径：", fp)
+	f, err := os.Create(fp)
+	defer f.Close()
+	if err != nil {
+		logr.Info(cf.FileName, err)
+		return
+	}
+
+	//读数据
+	cf.ReadDate()
+	buf := []byte{}
+	b := bytes.NewBuffer(buf)
+
+	//fmt.Printf("头标识：%s\n",cf.FileStrt.FileHead)
+	b.WriteString(cf.FileStrt.FileHead)
+	b.WriteString("\r\n")
+	b.WriteString(cf.FileStrt.HToString())
+	b.WriteString("\r\n")
+
+	b.WriteString(cf.FileStrt.FileBody)//文件体 标识
+	b.WriteString("\r\n")
+	for _, tc := range cf.FileStrt.FileBodys {
+		Str := tc.BToString()
+		b.WriteString(Str)
+		b.WriteString("\r\n")
+	}
+	logr.Infof("--读取的数据1---[%s]", b)
+	rb := b.Bytes()
+	logr.Infof("--读取的数据2---[%s]", string(rb))
+	cf.postToSftp(cf.FileName, rb)
+	w := bufio.NewWriter(f)  //创建新的 Writer 对象
+	var n int64
+	for {
+		c, err := b.WriteTo(w)
+		if err != nil {
+			break
+		}
+		if n == int64(b.Len()) {
+			break
+		}
+		n = n + c
+	}
+	//fmt.Println("---读取的buf数据--:", buf)
+	w.Flush()
+	f.Sync()
+}
+
+func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
+	//config.SetSection("sftp")
+	//user, _ := config.String("user")
+	//password, _ := config.String("passwd")
+	//host, _ := config.String("host")
+	//port, _ := config.String("port")
+	//rmtDir, _ := config.String("remoteDir")
+	//rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
+	//fileName := path.Base(fileName)
+	//rmtDir = path.Join(rmtDir,time.Now().Format("20060102"))
+	dbc := gormdb.GetInstance()
+	tmr := &models.Tbl_mcht_recon_list{}
+	err := dbc.Where("MCHT_CD = ?", cf.MCHT_CD).Find(&tmr).Error
+	if err != nil {
+		logr.Info("dbc find failed:", err)
+		return
+	}
+	if tmr.USER == "" || tmr.PASSWD == "" || tmr.HOST == "" {
+		logr.Infof("读配置错误:[%s][%s][%s]s", tmr.USER, tmr.PASSWD, tmr.HOST)
+		return
+	}
+	user := tmr.USER
+	password := tmr.PASSWD
+	host := tmr.HOST
+	port := tmr.PORT
+	rmtDir := tmr.REMOTE_DIR
+	rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
+	logr.Infof("SFTP:[%s][%s][%s][%s][%s][%s]", user, password, host, port, fileName, rmtDir)
+	if true {
+		myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+	}
+
 }
 
 func (cf *CrtFile) Finish() {
@@ -86,21 +144,23 @@ func (cf *CrtFile) Finish() {
 func (cf *CrtFile) ReadDate() {
 	dbc := gormdb.GetInstance()
 
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE INS_ID_CD = ? and STLM_DATE = ?", cf.InsIdCd, cf.STLM_DATE).Rows() // (*sql.Rows, error)
+	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows() // (*sql.Rows, error)
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		fmt.Printf("dbc.Raw fail:%s\n", err)
+		logr.Info("dbc.Raw fail: ", err)
 		return
 	}
 	if err != nil {
-		fmt.Printf("dbc.Raw fail:%s\n", err)
+		logr.Info("dbc.Raw fail: ", err)
 		return
 	}
-	cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
+	//cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
+	cf.Tbl_Clear_Data = []models.Tbl_clear_txn{}
 	record := 0        //交易总笔数
 	trans_amt_T := 0.0   //清算金额
 	true_fee_mod_T := 0.0  //清算手续费
 	trnrecont_T := 0.0  //结算总金额
+	//INS_ID_CD := "0"
 	for rows.Next() {
 		record ++
 		tc := models.Tbl_clear_txn{}
@@ -117,56 +177,81 @@ func (cf *CrtFile) ReadDate() {
 	}
 	//fmt.Println(trans_amt_T, true_fee_mod_T, trnrecont_T)
 	//处理文件头
-	cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.InsIdCd
+	if len(cf.Tbl_Clear_Data) > 0 {
+		cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.Tbl_Clear_Data[0].INS_ID_CD
+	}
+	//cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.MCHT_CD
 	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
 	cf.FileStrt.FileHeadInfo.Stlm_date = cf.STLM_DATE
-	cf.FileStrt.FileHeadInfo.TrnSucAm = strconv.FormatFloat(trans_amt_T,'f', 2, 64)
-	cf.FileStrt.FileHeadInfo.TrnFeeT = strconv.FormatFloat(true_fee_mod_T,'f', 2, 64)
-	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T,'f', 2, 64)
-	fmt.Printf("成功总笔数:%d\n", record)
+	cf.FileStrt.FileHeadInfo.TrnSucAm = strconv.FormatFloat(trans_amt_T, 'f', 2, 64)
+	cf.FileStrt.FileHeadInfo.TrnFeeT = strconv.FormatFloat(true_fee_mod_T, 'f', 2, 64)
+	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)
+	logr.Info("成功总笔数:", record)
 
 	cf.saveDatatoFStru()
-
 
 }
 
 func (cf *CrtFile) saveDatatoFStru() {
-	cf.FileStrt.FileBodys = make([]models.Body,0)
+	//cf.FileStrt.FileBodys = make([]models.Body,0)
+	cf.FileStrt.FileBodys = []models.Body{}
+	dbc := gormdb.GetInstance()
+
+	dbt, err := gorm.Open("mysql", "prodPmpCld:prodPmpCld@tcp(192.168.20.60:3306)/prodPmpCld?charset=utf8&parseTime=True&loc=Local")
+	if err != nil {
+		logr.Info(err)
+		return
+	}
+	defer dbt.Close()
+	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
+	dbt.DB().Ping()
+
 	for _, tc := range cf.Tbl_Clear_Data {
 		b := models.Body{}
-		tl := models.Tbl_tfr_his_trn_log{}
-		dbc := gormdb.GetInstance()
-		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tl).Error
+		tfr := models.Tbl_tfr_his_trn_log{}
+		tran := models.Tran_logs{}
+		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 		if err != nil {
-			fmt.Printf("dbc find failed:%s\n",err)
-			//return
+			logr.Info("dbc find failed:", err)
+			break
 		}
 
-		b.MCHT_CD  	= tc.MCHT_CD
-		b.TRANS_DATE    = tl.TRANS_DT
-		b.TRANS_TIME    = tl.TRANS_MT
-		b.STLM_DATE     = cf.STLM_DATE
-		b.TERM_ID       = tc.TERM_ID
-		b.TRANS_KIND    = tc.TRANS_KIND
-		b.KEY_RSP       = tc.KEY_RSP
-		b.PAN           = tc.PAN
+		b.MCHT_CD = tc.MCHT_CD
+		b.TRANS_DATE = tfr.TRANS_DT
+		b.TRANS_TIME = tfr.TRANS_MT
+		b.STLM_DATE = cf.STLM_DATE
+		b.TERM_ID = tc.TERM_ID
+		b.TRANS_KIND = tc.TRANS_KIND
+		b.KEY_RSP = tc.KEY_RSP
+		b.PAN = tc.PAN
 		b.CARD_KIND_DIS = tc.CARD_KIND_DIS
-		b.TRANS_AMT     = tc.TRANS_AMT
-		b.TRUE_FEE_MOD  = tc.TRUE_FEE_MOD
-		b.MCHT_SET_AMT  = tc.MCHT_SET_AMT
-		b.ERR_FEE_IN    = "0"
-		b.ERR_FEE_OUT	= "0"
-		fmt.Printf("prod_cd:%s\n", tl.PROD_CD)
-		if tl.PROD_CD == "1151"{
-			b.SYS_ID        = tl.INDUSTRY_ADDN_INF
-		} else if tl.PROD_CD == "1130" {
-			b.SYS_ID        = tl.RETRI_REF_NO
+		b.TRANS_AMT = tc.TRANS_AMT
+		b.TRUE_FEE_MOD = tc.TRUE_FEE_MOD
+		b.MCHT_SET_AMT = tc.MCHT_SET_AMT
+		b.ERR_FEE_IN = "0"
+		b.ERR_FEE_OUT = "0"
+		logr.Info("prod_cd:", tfr.PROD_CD)
+		if tfr.PROD_CD == "1151" {
+			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
+		} else if tfr.PROD_CD == "1130" {
+			b.SYS_ID = tfr.RETRI_REF_NO
 		}
-		b.INS_IN        = "0"
-		b.INS_REAL_IN   = "0"
-		b.INS_OUT       = "0"
-		b.PROXY_CD      = "0"
-		b.MEMBER_ID     = "0"
+		b.INS_IN = "0"
+		b.INS_REAL_IN = "0"
+		b.INS_OUT = "0"
+		b.PROXY_CD = "0"
+		b.MEMBER_ID = "0"
+		b.DUES = tc.HZJG_FEE
+		b.PROD_CD = tfr.PROD_CD
+		b.TRAND_CD = tfr.MA_TRANS_CD
+		b.BIZ_CD = tfr.BIZ_CD
+		//"2017050415054098157697"
+		err = dbt.Where("order_id = ?", b.SYS_ID).Find(&tran).Error
+		if err != nil {
+			logr.Info("db tran find failed:%s\n", err)
+			//break
+		}
+		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
 
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
@@ -178,39 +263,39 @@ func (cf *CrtFile) GetInsIdCd() (string, bool) {
 		return "", false
 	}
 
-	cf.InsIdCd = cf.Ins_id_cd[0]
+	cf.MCHT_CD = cf.Ins_id_cd[0]
 	cf.Ins_id_cd = cf.Ins_id_cd[1:]
-	fmt.Printf("取机构号：%s; 剩余机构号:%v\n", cf.InsIdCd, cf.Ins_id_cd)
+	logr.Infof("取机构号：%s; 剩余机构号:%v", cf.MCHT_CD, cf.Ins_id_cd)
 
-	return cf.InsIdCd, true
+	return cf.MCHT_CD, true
 }
 
 func (cf *CrtFile) geneFile() string {
 	cd, ok := cf.GetInsIdCd()
 	if ok {
-		cf.FileName =  "C_" + cd
+		cf.FileName = "C_" + cd
 	} else {
 		return ""
 	}
 
 	cf.FileName = cf.FileName + "_" + cf.STLM_DATE + ".txt"
-	fmt.Printf("生成对账文件名称：%s\n", cf.FileName)
+	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
 }
 
 func (cf *CrtFile) InitInsIdCd() {
-
+	//商户号
 	dbc := gormdb.GetInstance()
 
-	rows, err := dbc.Raw("SELECT distinct INS_ID_CD FROM tbl_ins_reconciliation").Rows() // (*sql.Rows, error)
+	rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows() // (*sql.Rows, error)
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		fmt.Printf("dbc.Raw fail:%s\n", err)
+		logr.Info("dbc.Raw fail:%s\n", err)
 		return
 	}
 	if err != nil {
-		fmt.Printf("dbc.Raw fail:%s\n", err)
+		logr.Info("dbc.Raw fail:%s\n", err)
 		return
 	}
 
@@ -222,6 +307,6 @@ func (cf *CrtFile) InitInsIdCd() {
 		}
 	}
 
-	fmt.Printf("初始化机构号:%v\n", cf.Ins_id_cd)
+	logr.Info("初始化机构号:", cf.Ins_id_cd)
 
 }
