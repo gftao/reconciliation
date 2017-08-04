@@ -39,7 +39,7 @@ func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IErro
 
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
-	cf.InitInsIdCd()
+	cf.InitMCHTCd()
 
 	return nil
 }
@@ -284,7 +284,7 @@ func (cf *CrtFile) geneFile() string {
 	return p
 }
 
-func (cf *CrtFile) InitInsIdCd() {
+func (cf *CrtFile) InitMCHTCd() {
 	//商户号
 	dbc := gormdb.GetInstance()
 
@@ -307,6 +307,6 @@ func (cf *CrtFile) InitInsIdCd() {
 		}
 	}
 
-	logr.Info("初始化机构号:", cf.Ins_id_cd)
+	logr.Info("初始化商户号:", cf.Ins_id_cd)
 
 }
