@@ -28,6 +28,8 @@ type CrtFile struct {
 	FileStrt             models.FileStrt            //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
+	dbtype string
+	dbstr string
 }
 
 func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IError {
@@ -40,8 +42,25 @@ func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IErro
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.InitMCHTCd()
+	cf.indb()
 
 	return nil
+}
+
+func (cf *CrtFile)indb() {
+	//"prodPmpCld:prodPmpCld@tcp(192.168.20.60:3306)/prodPmpCld?charset=utf8&parseTime=True&loc=Local"
+	config.SetSection("db1")
+	dbtype := config.StringDefault("db.type", "mysql")
+	dbhost := config.StringDefault("db.host", "127.0.0.1")
+	dbport := config.StringDefault("db.port", "3306")
+	dbname := config.StringDefault("db.dbname", "prodPmpCld")
+	dbuser := config.StringDefault("db.user", "root")
+	dbpasswd := config.StringDefault("db.passwd", "")
+	connStr := dbuser + ":" + dbpasswd + "@tcp(" + dbhost + ":" + dbport + ")/" + dbname +
+		"?charset=utf8&parseTime=True&loc=Local"
+
+	cf.dbtype = dbtype
+	cf.dbstr = connStr
 }
 
 func (cf *CrtFile) Run() {
@@ -104,15 +123,7 @@ func (cf *CrtFile) SaveToFile() {
 }
 
 func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
-	//config.SetSection("sftp")
-	//user, _ := config.String("user")
-	//password, _ := config.String("passwd")
-	//host, _ := config.String("host")
-	//port, _ := config.String("port")
-	//rmtDir, _ := config.String("remoteDir")
-	//rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
-	//fileName := path.Base(fileName)
-	//rmtDir = path.Join(rmtDir,time.Now().Format("20060102"))
+
 	dbc := gormdb.GetInstance()
 	tmr := &models.Tbl_mcht_recon_list{}
 	err := dbc.Where("MCHT_CD = ?", cf.MCHT_CD).Find(&tmr).Error
@@ -197,7 +208,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 	cf.FileStrt.FileBodys = []models.Body{}
 	dbc := gormdb.GetInstance()
 
-	dbt, err := gorm.Open("mysql", "prodPmpCld:prodPmpCld@tcp(192.168.20.60:3306)/prodPmpCld?charset=utf8&parseTime=True&loc=Local")
+	dbt, err := gorm.Open(cf.dbtype,  cf.dbstr)
 	if err != nil {
 		logr.Info(err)
 		return
