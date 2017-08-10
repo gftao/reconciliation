@@ -28,16 +28,17 @@ type CrtFile struct {
 	FileStrt             models.FileStrt            //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
-	dbtype string
-	dbstr string
+	dbtype               string
+	dbstr                string
 }
 
-func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IError {
+func (cf *CrtFile) Init(initParams run.InitParams, chainName string) gerror.IError {
 	cf.FileName = "C_"
-	cf.FilePath = config.StringDefault("filePath", ".")
-	cf.SysDate = sutil.GetSysDate()//今天
+	//cf.FileName = "C_"
+	cf.FilePath = config.StringDefault("filePath", "")
+	cf.SysDate = sutil.GetSysDate() //今天
 	cf.FileStrt = models.FileStrt{}
-	cf.STLM_DATE = chainName        //清算日期
+	cf.STLM_DATE = chainName //清算日期
 
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
@@ -47,7 +48,7 @@ func (cf *CrtFile)Init(initParams run.InitParams, chainName string) gerror.IErro
 	return nil
 }
 
-func (cf *CrtFile)indb() {
+func (cf *CrtFile) indb() {
 	//"prodPmpCld:prodPmpCld@tcp(192.168.20.60:3306)/prodPmpCld?charset=utf8&parseTime=True&loc=Local"
 	config.SetSection("db1")
 	dbtype := config.StringDefault("db.type", "mysql")
@@ -61,6 +62,7 @@ func (cf *CrtFile)indb() {
 
 	cf.dbtype = dbtype
 	cf.dbstr = connStr
+	logr.Info("[db1]：", cf.dbtype, cf.dbstr)
 }
 
 func (cf *CrtFile) Run() {
@@ -94,7 +96,7 @@ func (cf *CrtFile) SaveToFile() {
 	b.WriteString(cf.FileStrt.HToString())
 	b.WriteString("\r\n")
 
-	b.WriteString(cf.FileStrt.FileBody)//文件体 标识
+	b.WriteString(cf.FileStrt.FileBody) //文件体 标识
 	b.WriteString("\r\n")
 	for _, tc := range cf.FileStrt.FileBodys {
 		Str := tc.BToString()
@@ -105,7 +107,7 @@ func (cf *CrtFile) SaveToFile() {
 	rb := b.Bytes()
 	logr.Infof("--读取的数据2---[%s]", string(rb))
 	cf.postToSftp(cf.FileName, rb)
-	w := bufio.NewWriter(f)  //创建新的 Writer 对象
+	w := bufio.NewWriter(f) //创建新的 Writer 对象
 	var n int64
 	for {
 		c, err := b.WriteTo(w)
@@ -132,7 +134,7 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 		return
 	}
 	if tmr.USER == "" || tmr.PASSWD == "" || tmr.HOST == "" {
-		logr.Infof("读配置错误:[%s][%s][%s]s", tmr.USER, tmr.PASSWD, tmr.HOST)
+		logr.Infof("读配置错误:[%s][%s][%s]", tmr.USER, tmr.PASSWD, tmr.HOST)
 		return
 	}
 	user := tmr.USER
@@ -154,23 +156,23 @@ func (cf *CrtFile) Finish() {
 
 func (cf *CrtFile) ReadDate() {
 	dbc := gormdb.GetInstance()
-
+	defer dbc.Close()
 	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows() // (*sql.Rows, error)
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		logr.Info("dbc.Raw fail: ", err)
+		logr.Info("tbl_clear_txn not find: ", err)
 		return
 	}
 	if err != nil {
-		logr.Info("dbc.Raw fail: ", err)
+		logr.Info("tbl_clear_txn find fail: ", err)
 		return
 	}
 	//cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
 	cf.Tbl_Clear_Data = []models.Tbl_clear_txn{}
-	record := 0        //交易总笔数
-	trans_amt_T := 0.0   //清算金额
-	true_fee_mod_T := 0.0  //清算手续费
-	trnrecont_T := 0.0  //结算总金额
+	record := 0           //交易总笔数
+	trans_amt_T := 0.0    //清算金额
+	true_fee_mod_T := 0.0 //清算手续费
+	trnrecont_T := 0.0    //结算总金额
 	//INS_ID_CD := "0"
 	for rows.Next() {
 		record ++
@@ -208,7 +210,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 	cf.FileStrt.FileBodys = []models.Body{}
 	dbc := gormdb.GetInstance()
 
-	dbt, err := gorm.Open(cf.dbtype,  cf.dbstr)
+	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
 		logr.Info(err)
 		return
@@ -244,8 +246,8 @@ func (cf *CrtFile) saveDatatoFStru() {
 		logr.Info("prod_cd:", tfr.PROD_CD)
 		if tfr.PROD_CD == "1151" {
 			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
-		} else if tfr.PROD_CD == "1130" {
-			b.SYS_ID = tfr.RETRI_REF_NO
+		} else {
+			b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 		}
 		b.INS_IN = "0"
 		b.INS_REAL_IN = "0"
@@ -257,11 +259,12 @@ func (cf *CrtFile) saveDatatoFStru() {
 		b.TRAND_CD = tfr.MA_TRANS_CD
 		b.BIZ_CD = tfr.BIZ_CD
 		//"2017050415054098157697"
-		err = dbt.Where("order_id = ?", b.SYS_ID).Find(&tran).Error
+		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
 		if err != nil {
-			logr.Info("db tran find failed:%s\n", err)
+			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
 			//break
 		}
+		logr.Infof("sys_order_id=%s, cust_order_id=%s\n", b.SYS_ID, tran.CUST_ORDER_ID)
 		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
 
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
@@ -284,7 +287,7 @@ func (cf *CrtFile) GetInsIdCd() (string, bool) {
 func (cf *CrtFile) geneFile() string {
 	cd, ok := cf.GetInsIdCd()
 	if ok {
-		cf.FileName = "C_" + cd
+		cf.FileName = cf.FileName + cd
 	} else {
 		return ""
 	}
