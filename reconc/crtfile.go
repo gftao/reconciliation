@@ -156,7 +156,7 @@ func (cf *CrtFile) Finish() {
 
 func (cf *CrtFile) ReadDate() {
 	dbc := gormdb.GetInstance()
-	defer dbc.Close()
+
 	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows() // (*sql.Rows, error)
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
@@ -209,7 +209,6 @@ func (cf *CrtFile) saveDatatoFStru() {
 	//cf.FileStrt.FileBodys = make([]models.Body,0)
 	cf.FileStrt.FileBodys = []models.Body{}
 	dbc := gormdb.GetInstance()
-
 	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
 		logr.Info(err)
