@@ -32,7 +32,7 @@ type Tbl_clear_txn struct {
 	ORG_CUP_SSN         string `gorm:"column:ORG_CUP_SSN"`
 	POS_ENTRY_MODE      string `gorm:"column:POS_ENTRY_MODE"`
 	RSP_CODE            string `gorm:"column:RSP_CODE"`
-	TRUE_FEE_MOD        string `gorm:"column:TRUE_FEE_MOD"`    //交易手续费
+	TRUE_FEE_MOD        string `gorm:"column:TRUE_FEE_MOD"`    //交易手续费 错的
 	TRUE_FEE_BI         string `gorm:"column:TRUE_FEE_BI"`
 	TRUE_FEE_FD         string `gorm:"column:TRUE_FEE_FD"`
 	TRUE_FEE_FFD        string `gorm:"column:TRUE_FEE_FFD"`
@@ -44,7 +44,7 @@ type Tbl_clear_txn struct {
 	VIR_FEE_BI          string `gorm:"column:VIR_FEE_BI"`
 	VIR_FEE_BD          string `gorm:"column:VIR_FEE_BD"`
 	VIR_FEE_FD          string `gorm:"column:VIR_FEE_FD"`
-	MCHT_FEE            string `gorm:"column:MCHT_FEE"`
+	MCHT_FEE            string `gorm:"column:MCHT_FEE"`		//交易手续费
 	VAR_5               string `gorm:"column:VAR_5"`
 	MCHT_VIR_FEE        string `gorm:"column:MCHT_VIR_FEE"`
 	STAND_BANK_FEE      string `gorm:"column:STAND_BANK_FEE"`

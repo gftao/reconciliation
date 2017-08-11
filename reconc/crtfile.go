@@ -103,7 +103,7 @@ func (cf *CrtFile) SaveToFile() {
 		b.WriteString(Str)
 		b.WriteString("\r\n")
 	}
-	logr.Infof("--读取的数据1---[%s]", b)
+	//logr.Infof("--读取的数据1---[%s]", b)
 	rb := b.Bytes()
 	logr.Infof("--读取的数据2---[%s]", string(rb))
 	cf.postToSftp(cf.FileName, rb)
@@ -180,7 +180,7 @@ func (cf *CrtFile) ReadDate() {
 		dbc.ScanRows(rows, &tc)
 
 		a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
-		f, _ := strconv.ParseFloat(tc.TRUE_FEE_MOD, 64)
+		f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
 		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
 
 		trans_amt_T += a
@@ -238,7 +238,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 		b.PAN = tc.PAN
 		b.CARD_KIND_DIS = tc.CARD_KIND_DIS
 		b.TRANS_AMT = tc.TRANS_AMT
-		b.TRUE_FEE_MOD = tc.TRUE_FEE_MOD
+		b.TRUE_FEE_MOD = tc.MCHT_FEE
 		b.MCHT_SET_AMT = tc.MCHT_SET_AMT
 		b.ERR_FEE_IN = "0"
 		b.ERR_FEE_OUT = "0"
