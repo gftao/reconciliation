@@ -59,7 +59,7 @@ type Tbl_clear_txn struct {
 	ERR_FEE_IN          string `gorm:"column:ERR_FEE_IN"`
 	ERR_FEE_OUT         string `gorm:"column:ERR_FEE_OUT"`
 	ERR_CODE            string `gorm:"column:ERR_CODE"`
-	JT_MCHT_CD          string `gorm:"column:JT_MCHT_CD"`
+	JT_MCHT_CD          string `gorm:"column:JT_MCHT_CD"`	//集团商户号
 	EXPAND_ORG_CD       string `gorm:"column:EXPAND_ORG_CD"`
 	SPE_SERV_INST       string `gorm:"column:SPE_SERV_INST"`
 	PROP_INS            string `gorm:"column:PROP_INS"`

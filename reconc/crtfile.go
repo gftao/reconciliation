@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"golib/modules/logr"
+	"database/sql"
 )
 
 type CrtFile struct {
@@ -30,6 +31,7 @@ type CrtFile struct {
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
 	dbstr                string
+	MCHT_TP              map[string]string
 }
 
 func (cf *CrtFile) Init(initParams run.InitParams, chainName string) gerror.IError {
@@ -39,7 +41,7 @@ func (cf *CrtFile) Init(initParams run.InitParams, chainName string) gerror.IErr
 	cf.SysDate = sutil.GetSysDate() //今天
 	cf.FileStrt = models.FileStrt{}
 	cf.STLM_DATE = chainName //清算日期
-
+	cf.MCHT_TP = make(map[string]string,1)
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.InitMCHTCd()
@@ -144,7 +146,7 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 	rmtDir := tmr.REMOTE_DIR
 	rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
 	logr.Infof("SFTP:[%s][%s][%s][%s][%s][%s]", user, password, host, port, fileName, rmtDir)
-	if true {
+	if false {
 		myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
 	}
 
@@ -156,8 +158,14 @@ func (cf *CrtFile) Finish() {
 
 func (cf *CrtFile) ReadDate() {
 	dbc := gormdb.GetInstance()
-
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows() // (*sql.Rows, error)
+	var rows *sql.Rows
+	var err error
+	logr.Info(cf.MCHT_CD,"->",cf.MCHT_TP[cf.MCHT_CD])
+	if cf.MCHT_TP[cf.MCHT_CD] == "0" {
+		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
+	}else if cf.MCHT_TP[cf.MCHT_CD] == "1"{
+		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
+	}
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		logr.Info("tbl_clear_txn not find: ", err)
@@ -286,7 +294,7 @@ func (cf *CrtFile) GetInsIdCd() (string, bool) {
 func (cf *CrtFile) geneFile() string {
 	cd, ok := cf.GetInsIdCd()
 	if ok {
-		cf.FileName = cf.FileName + cd
+		cf.FileName = cf.FileName[:2] + cd
 	} else {
 		return ""
 	}
@@ -300,9 +308,10 @@ func (cf *CrtFile) geneFile() string {
 func (cf *CrtFile) InitMCHTCd() {
 	//商户号
 	dbc := gormdb.GetInstance()
-
-	rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows() // (*sql.Rows, error)
+	//rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows()
+	rows, err := dbc.Raw("SELECT MCHT_CD, mcht_ty FROM tbl_mcht_recon_list").Rows()
 	defer rows.Close()
+
 	if err == gorm.ErrRecordNotFound {
 		logr.Info("dbc.Raw fail:%s\n", err)
 		return
@@ -313,13 +322,17 @@ func (cf *CrtFile) InitMCHTCd() {
 	}
 
 	for rows.Next() {
-		in := ""
-		rows.Scan(&in)
-		if in != "" {
-			cf.Ins_id_cd = append(cf.Ins_id_cd, in)
+		mc := ""
+		mt := ""
+		rows.Scan(&mc,&mt)
+		//logr.Info("MCHT_CD=",mc,"mcht_ty=", mt)
+		if mc != "" {
+			cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
+			cf.MCHT_TP[mc] = mt
 		}
 	}
 
-	logr.Info("初始化商户号:", cf.Ins_id_cd)
+	//logr.Info("初始化商户号:", cf.Ins_id_cd)
+	logr.Info("初始化商户号:", cf.MCHT_TP)
 
 }

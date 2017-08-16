@@ -107,6 +107,7 @@ func PosByteSftp(user, password, host, port, fileName, rmtDir string, fileData [
 	sftpClient, err = connect(user, password, host, p)
 	if err != nil {
 		logr.Info("SSH 连接出错", err)
+		return err
 	}
 	defer sftpClient.Close()
 	//用来测试的本地文件路径 和 远程机器上的文件夹
