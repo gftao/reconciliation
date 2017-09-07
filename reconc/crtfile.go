@@ -17,6 +17,7 @@ import (
 
 	"golib/modules/logr"
 	"database/sql"
+	"htdRec/myftp"
 )
 
 type CrtFile struct {
@@ -39,7 +40,7 @@ func (cf *CrtFile) Init(initParams run.InitParams, chainName string) gerror.IErr
 	cf.FileName = "C_"
 	//cf.FileName = "C_"
 	cf.FilePath = config.StringDefault("filePath", "")
-	cf.sendto = config.BoolDefault("sendto",true)
+	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info(cf.sendto)
 	cf.SysDate = sutil.GetSysDate() //今天
 	cf.FileStrt = models.FileStrt{}
@@ -132,27 +133,50 @@ func (cf *CrtFile) SaveToFile() {
 func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 
 	dbc := gormdb.GetInstance()
-	tmr := &models.Tbl_mcht_recon_list{}
-	err := dbc.Where("MCHT_CD = ?", cf.MCHT_CD).Find(&tmr).Error
+
+	rows, err := dbc.Raw("SELECT * FROM tbl_mcht_recon_list WHERE MCHT_CD = ?", cf.MCHT_CD).Rows()
 	if err != nil {
 		logr.Info("dbc find failed:", err)
 		return
 	}
-	if tmr.USER == "" || tmr.PASSWD == "" || tmr.HOST == "" {
-		logr.Infof("读配置错误:[%s][%s][%s]", tmr.USER, tmr.PASSWD, tmr.HOST)
-		return
-	}
-	user := tmr.USER
-	password := tmr.PASSWD
-	host := tmr.HOST
-	port := tmr.PORT
-	rmtDir := tmr.REMOTE_DIR
-	rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
-	logr.Infof("SFTP:[%s][%s][%s][%s][%s][%s]", user, password, host, port, fileName, rmtDir)
-	if cf.sendto  {
-		myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
-	}
+	defer rows.Close()
+	for rows.Next() {
+		tmr := &models.Tbl_mcht_recon_list{}
+		dbc.ScanRows(rows, tmr)
+		if tmr.USER == "" || tmr.PASSWD == "" || tmr.HOST == "" {
+			logr.Infof("读配置错误:[%s][%s][%s]", tmr.USER, tmr.PASSWD, tmr.HOST)
+			return
+		}
+		user := tmr.USER
+		password := tmr.PASSWD
+		host := tmr.HOST
+		port := tmr.PORT
+		rmtDir := tmr.REMOTE_DIR
+		trans_ty := tmr.Transp_ty
+		rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
+		logr.Infof("->:[%s][%s][%s][%s][%s][%s][%s]", trans_ty, user, password, host, port, fileName, rmtDir)
+		if cf.sendto {
+			switch trans_ty {
+			case "0":
+				logr.Infof("SFTP:")
+				myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+			case "1":
+				logr.Infof("FTP with TLS:")
+				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
+				if err != nil {
+					logr.Error(err)
+				}
+			case "2":
+				logr.Infof("FTP without TLS:")
+				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, fileData)
+				if err != nil {
+					logr.Error(err)
+				}
+			default:
 
+			}
+		}
+	}
 }
 
 func (cf *CrtFile) Finish() {
@@ -312,7 +336,7 @@ func (cf *CrtFile) InitMCHTCd() {
 	//商户号
 	dbc := gormdb.GetInstance()
 	//rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows()
-	rows, err := dbc.Raw("SELECT MCHT_CD, mcht_ty FROM tbl_mcht_recon_list").Rows()
+	rows, err := dbc.Raw("SELECT distinct MCHT_CD, mcht_ty FROM tbl_mcht_recon_list").Rows()
 	defer rows.Close()
 
 	if err == gorm.ErrRecordNotFound {
@@ -328,14 +352,12 @@ func (cf *CrtFile) InitMCHTCd() {
 		mc := ""
 		mt := ""
 		rows.Scan(&mc, &mt)
-		//logr.Info("MCHT_CD=",mc,"mcht_ty=", mt)
 		if mc != "" {
 			cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
 			cf.MCHT_TP[mc] = mt
 		}
 	}
 
-	//logr.Info("初始化商户号:", cf.Ins_id_cd)
 	logr.Info("初始化商户号:", cf.MCHT_TP)
 
 }
