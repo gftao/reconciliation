@@ -18,6 +18,7 @@ import (
 	"golib/modules/logr"
 	"database/sql"
 	"htdRec/myftp"
+	"golib/security"
 )
 
 type CrtFile struct {
@@ -50,7 +51,6 @@ func (cf *CrtFile) Init(initParams run.InitParams, chainName string) gerror.IErr
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.InitMCHTCd()
 	cf.indb()
-
 	return nil
 }
 
@@ -112,7 +112,9 @@ func (cf *CrtFile) SaveToFile() {
 	//logr.Infof("--读取的数据1---[%s]", b)
 	rb := b.Bytes()
 	logr.Infof("--读取的数据2---[%s]", string(rb))
+
 	cf.postToSftp(cf.FileName, rb)
+
 	w := bufio.NewWriter(f) //创建新的 Writer 对象
 	var n int64
 	for {
@@ -153,9 +155,23 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 		port := tmr.PORT
 		rmtDir := tmr.REMOTE_DIR
 		trans_ty := tmr.Transp_ty
+		AESKEY := tmr.EXT2
 		rmtDir = strings.Replace(rmtDir, "\\", "//", -1)
 		logr.Infof("->:[%s][%s][%s][%s][%s][%s][%s]", trans_ty, user, password, host, port, fileName, rmtDir)
+		logr.Info("Aes密钥：", AESKEY)
 		if cf.sendto {
+			if AESKEY != "" {
+				logr.Info("Aes密钥：", AESKEY)
+				cipherdata, err := security.AesEcbEncrypt(fileData, []byte(AESKEY))
+				if err != nil {
+					logr.Info(cf.FileName, err)
+					return
+				}
+				AESinfo := security.EncodeBase64(cipherdata)
+				fileData = AESinfo
+				logr.Infof("--Aes加密后的数据---[%s]", fileData)
+			}
+
 			switch trans_ty {
 			case "0":
 				logr.Infof("SFTP:")

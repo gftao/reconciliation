@@ -67,7 +67,7 @@ func MyftpTSL(user, password, host, port, fileName, rmtDir string, fileDta []byt
 		logr.Info("Connect err:", err)
 		return err
 	}
-	//defer ftp.Close()
+	defer ftp.Close()
 
 	config := &tls.Config{
 		InsecureSkipVerify: true,
