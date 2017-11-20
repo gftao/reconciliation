@@ -297,7 +297,12 @@ func (cf *CrtFile) saveDatatoFStru() {
 		if tfr.PROD_CD == "1151" {
 			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
 		} else {
-			b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
+			if tfr.RETRI_REF_NO[:1] == "7"{
+				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
+			}else {
+				b.SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
+			}
+
 		}
 		b.INS_IN = "0"
 		b.INS_REAL_IN = "0"
@@ -315,7 +320,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 			//break
 		}
 		logr.Infof("sys_order_id=%s, cust_order_id=%s\n", b.SYS_ID, tran.CUST_ORDER_ID)
-		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
+			b.CUST_ORDER_ID = tran.CUST_ORDER_ID
 
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
@@ -365,8 +370,8 @@ func (cf *CrtFile) InitMCHTCd() {
 	}
 
 	for rows.Next() {
-		mc := ""
-		mt := ""
+		mc , mt := "", ""
+
 		rows.Scan(&mc, &mt)
 		if mc != "" {
 			cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
