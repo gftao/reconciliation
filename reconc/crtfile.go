@@ -220,23 +220,23 @@ func (cf *CrtFile) ReadDate() {
 	}
 	//cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
 	cf.Tbl_Clear_Data = []models.Tbl_clear_txn{}
-	record := 0           //交易总笔数
-	trans_amt_T := 0.0    //清算金额
-	true_fee_mod_T := 0.0 //清算手续费
-	trnrecont_T := 0.0    //结算总金额
+	//record := 0           //交易总笔数
+	//trans_amt_T := 0.0    //清算金额
+	//true_fee_mod_T := 0.0 //清算手续费
+	//trnrecont_T := 0.0    //结算总金额
 	//INS_ID_CD := "0"
 	for rows.Next() {
-		record ++
+		//record ++
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
-
-		a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
-		f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
-		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
-
-		trans_amt_T += a
-		true_fee_mod_T += f
-		trnrecont_T += m
+		//
+		//a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
+		//f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
+		//m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
+		//
+		//trans_amt_T += a
+		//true_fee_mod_T += f
+		//trnrecont_T += m
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
 	}
 	//fmt.Println(trans_amt_T, true_fee_mod_T, trnrecont_T)
@@ -245,12 +245,6 @@ func (cf *CrtFile) ReadDate() {
 		cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.Tbl_Clear_Data[0].INS_ID_CD
 	}
 	//cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.MCHT_CD
-	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
-	cf.FileStrt.FileHeadInfo.Stlm_date = cf.STLM_DATE
-	cf.FileStrt.FileHeadInfo.TrnSucAm = strconv.FormatFloat(trans_amt_T, 'f', 2, 64)
-	cf.FileStrt.FileHeadInfo.TrnFeeT = strconv.FormatFloat(true_fee_mod_T, 'f', 2, 64)
-	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)
-	logr.Info("成功总笔数:", record)
 
 	cf.saveDatatoFStru()
 
@@ -268,16 +262,28 @@ func (cf *CrtFile) saveDatatoFStru() {
 	defer dbt.Close()
 	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
 	dbt.DB().Ping()
-
+	record := 0           //交易总笔数
+	trans_amt_T := 0.0    //清算金额
+	true_fee_mod_T := 0.0 //清算手续费
+	trnrecont_T := 0.0    //结算总金额
 	for _, tc := range cf.Tbl_Clear_Data {
 		b := models.Body{}
 		tfr := models.Tbl_tfr_his_trn_log{}
 		tran := models.Tran_logs{}
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 		if err != nil {
-			logr.Info("dbc find failed:", err)
-			break
+			logr.Info("dbc find failed, KEY_RSP = %s",tc.KEY_RSP, err)
+			continue
 		}
+
+		record ++
+		a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
+		f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
+		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
+
+		trans_amt_T += a
+		true_fee_mod_T += f
+		trnrecont_T += m
 
 		b.MCHT_CD = tc.MCHT_CD
 		b.TRANS_DATE = tfr.TRANS_DT
@@ -297,9 +303,9 @@ func (cf *CrtFile) saveDatatoFStru() {
 		if tfr.PROD_CD == "1151" {
 			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
 		} else {
-			if tfr.RETRI_REF_NO[:1] == "7"{
+			if tfr.RETRI_REF_NO[:1] == "7" {
 				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
-			}else {
+			} else {
 				b.SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
 			}
 
@@ -320,10 +326,19 @@ func (cf *CrtFile) saveDatatoFStru() {
 			//break
 		}
 		logr.Infof("sys_order_id=%s, cust_order_id=%s\n", b.SYS_ID, tran.CUST_ORDER_ID)
-			b.CUST_ORDER_ID = tran.CUST_ORDER_ID
+		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
 
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
+
+	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
+	cf.FileStrt.FileHeadInfo.Stlm_date = cf.STLM_DATE
+	cf.FileStrt.FileHeadInfo.TrnSucAm = strconv.FormatFloat(trans_amt_T, 'f', 2, 64)
+	cf.FileStrt.FileHeadInfo.TrnFeeT = strconv.FormatFloat(true_fee_mod_T, 'f', 2, 64)
+	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)
+	logr.Info("成功总笔数:", record)
+
+	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
 }
 
 func (cf *CrtFile) GetInsIdCd() (string, bool) {
@@ -370,7 +385,7 @@ func (cf *CrtFile) InitMCHTCd() {
 	}
 
 	for rows.Next() {
-		mc , mt := "", ""
+		mc, mt := "", ""
 
 		rows.Scan(&mc, &mt)
 		if mc != "" {
