@@ -303,12 +303,11 @@ func (cf *CrtFile) saveDatatoFStru() {
 		if tfr.PROD_CD == "1151" {
 			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
 		} else {
-			if tfr.RETRI_REF_NO[:1] == "7" {
+			if tfr.RETRI_REF_NO[:1] == cf.STLM_DATE[3:4] {
 				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			} else {
 				b.SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
 			}
-
 		}
 		b.INS_IN = "0"
 		b.INS_REAL_IN = "0"
