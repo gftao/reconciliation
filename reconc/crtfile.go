@@ -372,6 +372,7 @@ func (cf *CrtFile) InitMCHTCd() {
 	//商户号
 	mc, ok := config.String("MCHT_CD")
 	if ok && mc != "" {
+		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
 		mt := config.StringDefault("MCHT_TY", "0")
 		logr.Info("读配置文件", mc, mt)
 		cf.MCHT_TP[mc] = mt
