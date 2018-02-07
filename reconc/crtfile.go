@@ -272,7 +272,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 		tran := models.Tran_logs{}
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 		if err != nil {
-			logr.Info("dbc find failed, KEY_RSP = %s",tc.KEY_RSP, err)
+			logr.Info("dbc find failed, KEY_RSP = %s", tc.KEY_RSP, err)
 			continue
 		}
 
@@ -368,7 +368,15 @@ func (cf *CrtFile) geneFile() string {
 }
 
 func (cf *CrtFile) InitMCHTCd() {
+
 	//商户号
+	mc, ok := config.String("MCHT_CD")
+	if ok && mc != "" {
+		mt := config.StringDefault("MCHT_TY", "0")
+		logr.Info("读配置文件", mc, mt)
+		cf.MCHT_TP[mc] = mt
+	}
+
 	dbc := gormdb.GetInstance()
 	//rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows()
 	rows, err := dbc.Raw("SELECT distinct MCHT_CD, mcht_ty FROM tbl_mcht_recon_list").Rows()
