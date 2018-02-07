@@ -375,6 +375,7 @@ func (cf *CrtFile) InitMCHTCd() {
 		mt := config.StringDefault("MCHT_TY", "0")
 		logr.Info("读配置文件", mc, mt)
 		cf.MCHT_TP[mc] = mt
+		return
 	}
 
 	dbc := gormdb.GetInstance()
