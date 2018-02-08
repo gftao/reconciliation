@@ -290,7 +290,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 		b.TRANS_TIME = tfr.TRANS_MT
 		b.STLM_DATE = cf.STLM_DATE
 		b.TERM_ID = tc.TERM_ID
-		b.TRANS_KIND = tc.TRANS_KIND
+		b.TRANS_KIND = tc.TXN_DESC
 		b.KEY_RSP = tc.KEY_RSP
 		b.PAN = tc.PAN
 		b.CARD_KIND_DIS = tc.CARD_KIND_DIS
