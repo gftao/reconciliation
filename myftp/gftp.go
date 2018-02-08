@@ -8,6 +8,7 @@ import (
 	"golib/modules/logr"
 	"gopkg.in/dutchcoders/goftp.v1"
 	"crypto/tls"
+	"runtime/debug"
 )
 
 func Myftp(user, password, host, port, fileName, rmtDir string, fileDta []byte) error {
@@ -51,6 +52,7 @@ func MyftpTSL(user, password, host, port, fileName, rmtDir string, fileDta []byt
 	defer func() {
 		if r := recover(); r != nil {
 			logr.Info("recover:", r)
+			debug.PrintStack()
 		}
 	}()
 	var ftp *goftp.FTP
