@@ -326,7 +326,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 		}
 		logr.Infof("sys_order_id=%s, cust_order_id=%s\n", b.SYS_ID, tran.CUST_ORDER_ID)
 		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
-
+		b.EXT_FLD = tran.EXT_FLD7
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 

@@ -9,8 +9,8 @@ type FileStrt struct {
 	FileHead     string
 	FileHeadInfo FileHeadInfo
 
-	FileBody     string
-	FileBodys    []Body
+	FileBody  string
+	FileBodys []Body
 }
 
 type FileHeadInfo struct {
@@ -49,6 +49,7 @@ type Body struct {
 	TRAND_CD      string //交易码
 	BIZ_CD        string //业务码
 	CUST_ORDER_ID string //第三方订单号//机构上送订单号
+	EXT_FLD       string //备注
 }
 
 func (fs *FileStrt) Init() {
@@ -56,7 +57,7 @@ func (fs *FileStrt) Init() {
 	fs.FileBody = "商户号,交易日期,交易时间,清算日期,终端编号,交易类型,交易流水号," +
 		"交易卡号,卡类型,交易本金,交易手续费,交易结算资金,应收差错费用,应付差错费用," +
 		"系统流水号,机构基准收入,机构实际收入,机构营销返佣,代理编码,会员号," +
-		"应付费用,产品码,交易码,业务码,第三方订单号"
+		"应付费用,产品码,交易码,业务码,第三方订单号,备注"
 
 }
 
