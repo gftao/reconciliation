@@ -59,26 +59,26 @@ type Tran_logs struct {
 	CLD_ORDER_ID      string
 	DES_ACQ_INS_ID    string
 	DES_MCHNT_CD      string
-	EXT_FLD1          string
-	EXT_FLD2          string
-	EXT_FLD3          string
-	EXT_FLD4          string
-	EXT_FLD5          string
-	EXT_FLD6          string
-	EXT_FLD7          string
-	EXT_FLD8          string
-	EXT_FLD9          string
-	EXT_FLD10         string
-	EXT_FLD11         string
-	EXT_FLD12         string
-	EXT_FLD13         string
-	EXT_FLD14         string
-	EXT_FLD15         string
-	EXT_FLD16         string
-	EXT_FLD17         string
-	EXT_FLD18         string
-	EXT_FLD19         string
-	EXT_FLD20         string
+	Ext_fld1          string
+	Ext_fld2          string
+	Ext_fld3          string
+	Ext_fld4          string
+	Ext_fld5          string
+	Ext_fld6          string
+	Ext_fld7          string
+	Ext_fld8          string
+	Ext_fld9          string
+	Ext_fld10         string
+	Ext_fld11         string
+	Ext_fld12         string
+	Ext_fld13         string
+	Ext_fld14         string
+	Ext_fld15         string
+	Ext_fld16         string
+	Ext_fld17         string
+	Ext_fld18         string
+	Ext_fld19         string
+	Ext_fld20         string
 	CUST_ORDER_ID     string //
 	ORDER_STAT        string
 	ORDER_INFO        string

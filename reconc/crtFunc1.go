@@ -3,7 +3,7 @@ package reconc
 import (
 	"golib/gerror"
 	"golib/modules/gormdb"
- 	"github.com/jinzhu/gorm"
+	"github.com/jinzhu/gorm"
 	"os"
 	"htdRec/models"
 	"golib/modules/config"
@@ -12,42 +12,42 @@ import (
 	"htdRec/myfstp"
 	"bytes"
 	"strings"
-
 	"golib/modules/logr"
 	"database/sql"
 	"htdRec/myftp"
 	"golib/security"
-	"time"
+	"fmt"
 )
 
-type CrtFile struct {
-	FileName             string                     //对账文件名
-	FilePath             string                     //路径
-	SysDate              string                     //当前时间
+type CrtFunc1 struct {
+	FileName string //对账文件名
+	FilePath string //路径
+	//SysDate              string                     //当前时间
 	MCHT_CD              string                     //当前机构号
 	STLM_DATE            string                     //清算日期
 	Ins_id_cd            []string                   //全部机构号
-	FileStrt             models.FileStrt            //文件结构
-	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
+	FileStrt             models.FileStrt1           //文件结构
+	Tbl_Clear_Data       []models.Tbl_clear_txn     //清算表数据
+	Tran_logs            []models.Tran_logs         //当前交易表数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
 	dbstr                string
 	MCHT_TP              map[string]string
 	sendto               bool
+	recon                models.Tbl_mcht_recon_list
+	TERM_ID              string
 }
 
-func (cf *CrtFile) Init(chainName string, mc string) gerror.IError {
-	cf.FileName = "C_"
+func (cf *CrtFunc1) Init(chainName string, mc string) gerror.IError {
+	cf.FileName = "spdb_"
 
 	cf.FilePath = config.StringDefault("filePath", "")
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
 
-	cf.SysDate = time.Now().Format("20060102") //今天
-	cf.FileStrt = models.FileStrt{}
+	cf.FileStrt = models.FileStrt1{}
 	cf.STLM_DATE = chainName //清算日期
 	cf.MCHT_TP = make(map[string]string, 1)
-	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.MCHT_CD = mc
 	cf.InitMCHTCd(mc)
@@ -55,8 +55,7 @@ func (cf *CrtFile) Init(chainName string, mc string) gerror.IError {
 	return nil
 }
 
-func (cf *CrtFile) indb() {
-	//"prodPmpCld:prodPmpCld@tcp(192.168.20.60:3306)/prodPmpCld?charset=utf8&parseTime=True&loc=Local"
+func (cf *CrtFunc1) indb() {
 	config.SetSection("db1")
 	dbtype := config.StringDefault("db.type", "mysql")
 	dbhost := config.StringDefault("db.host", "127.0.0.1")
@@ -72,49 +71,52 @@ func (cf *CrtFile) indb() {
 	logr.Info("[db1]：", cf.dbtype, cf.dbstr)
 }
 
-func (cf *CrtFile) Run() {
-	//for {
-	//	if len(cf.Ins_id_cd) == 0 {
-	//		return
-	//	}
-	//	cf.SaveToFile()
-	//}
-	cf.SaveToFile()
+func (cf *CrtFunc1) Run() {
+	err := cf.SaveToFile()
+	if err != nil {
+		logr.Error(err)
+		return
+	}
+	err = cf.DoF587()
+	if err != nil {
+		logr.Error(err)
+		return
+	}
 	return
 }
-func (cf *CrtFile) SaveToFile() {
+
+func (cf *CrtFunc1) SaveToFile() error {
 	fp := cf.geneFile()
 	logr.Info("对账文件路径：", fp)
 	f, err := os.Create(fp)
 	defer f.Close()
 	if err != nil {
 		logr.Info(cf.FileName, err)
-		return
+		return err
 	}
 
 	//读数据
-	cf.ReadDate()
+	err = cf.ReadDate()
+	if err != nil {
+		return err
+	}
 	buf := []byte{}
 	b := bytes.NewBuffer(buf)
-
-	//fmt.Printf("头标识：%s\n",cf.FileStrt.FileHead)
-	b.WriteString(cf.FileStrt.FileHead)
-	b.WriteString("\r\n")
 	b.WriteString(cf.FileStrt.HToString())
 	b.WriteString("\r\n")
 
-	b.WriteString(cf.FileStrt.FileBody) //文件体 标识
-	b.WriteString("\r\n")
 	for _, tc := range cf.FileStrt.FileBodys {
 		Str := tc.BToString()
 		b.WriteString(Str)
 		b.WriteString("\r\n")
 	}
-	//logr.Infof("--读取的数据1---[%s]", b)
 	rb := b.Bytes()
 	logr.Infof("--读取的数据2---[%s]", string(rb))
 
-	cf.postToSftp(cf.FileName, rb)
+	err = cf.postToSftp(cf.FileName, rb)
+	if err != nil {
+		return err
+	}
 
 	w := bufio.NewWriter(f) //创建新的 Writer 对象
 	var n int64
@@ -128,19 +130,19 @@ func (cf *CrtFile) SaveToFile() {
 		}
 		n = n + c
 	}
-	//fmt.Println("---读取的buf数据--:", buf)
 	w.Flush()
 	f.Sync()
+	return nil
 }
 
-func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
+func (cf *CrtFunc1) postToSftp(fileName string, fileData []byte) error {
 
 	dbc := gormdb.GetInstance()
 
 	rows, err := dbc.Raw("SELECT * FROM tbl_mcht_recon_list WHERE MCHT_CD = ?", cf.MCHT_CD).Rows()
 	if err != nil {
 		logr.Info("dbc find failed:", err)
-		return
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -148,7 +150,7 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 		dbc.ScanRows(rows, tmr)
 		if tmr.USER == "" || tmr.PASSWD == "" || tmr.HOST == "" {
 			logr.Infof("读配置错误:[%s][%s][%s]", tmr.USER, tmr.PASSWD, tmr.HOST)
-			return
+			return fmt.Errorf("读配置错误:[%s][%s][%s]", tmr.USER, tmr.PASSWD, tmr.HOST)
 		}
 		user := tmr.USER
 		password := tmr.PASSWD
@@ -166,7 +168,7 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 				cipherdata, err := security.AesEcbEncrypt(fileData, []byte(AESKEY))
 				if err != nil {
 					logr.Info(cf.FileName, err)
-					return
+					return err
 				}
 				AESinfo := security.EncodeBase64(cipherdata)
 				fileData = AESinfo
@@ -176,31 +178,35 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 			switch trans_ty {
 			case "0":
 				logr.Infof("SFTP:")
-				myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+				err = myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+				if err != nil {
+					return err
+				}
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
+					return err
 				}
 			case "2":
 				logr.Infof("FTP without TLS:")
 				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
+					return err
 				}
-			default:
-
 			}
 		}
 	}
+	return nil
 }
 
-func (cf *CrtFile) Finish() {
+func (cf *CrtFunc1) Finish() {
 	return
 }
 
-func (cf *CrtFile) ReadDate() {
+func (cf *CrtFunc1) ReadDate() error {
 	dbc := gormdb.GetInstance()
 	var rows *sql.Rows
 	var err error
@@ -210,69 +216,76 @@ func (cf *CrtFile) ReadDate() {
 	} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
 		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
 	} else {
-		return
+		return fmt.Errorf("商户类型不支持")
 	}
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		logr.Info("tbl_clear_txn not find: ", err)
-		return
-	}
-	if err != nil {
+		return err
+	} else if err != nil {
 		logr.Info("tbl_clear_txn find fail: ", err)
-		return
+		return err
 	}
-	//cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
-	cf.Tbl_Clear_Data = []models.Tbl_clear_txn{}
-	//record := 0           //交易总笔数
-	//trans_amt_T := 0.0    //清算金额
-	//true_fee_mod_T := 0.0 //清算手续费
-	//trnrecont_T := 0.0    //结算总金额
-	//INS_ID_CD := "0"
 	for rows.Next() {
-		//record ++
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
-		//
-		//a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
-		//f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
-		//m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
-		//
-		//trans_amt_T += a
-		//true_fee_mod_T += f
-		//trnrecont_T += m
+
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
 	}
-	//fmt.Println(trans_amt_T, true_fee_mod_T, trnrecont_T)
-	//处理文件头
-	if len(cf.Tbl_Clear_Data) > 0 {
-		cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.Tbl_Clear_Data[0].INS_ID_CD
-	}
-	//cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.MCHT_CD
-
-	cf.saveDatatoFStru()
-
-}
-
-func (cf *CrtFile) saveDatatoFStru() {
-	//cf.FileStrt.FileBodys = make([]models.Body,0)
-	cf.FileStrt.FileBodys = []models.Body{}
-	dbc := gormdb.GetInstance()
+	/*
+	//云流水表数据
 	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
-		logr.Info(err)
-		return
+		logr.Info("open db err:", err)
+		return err
 	}
 	defer dbt.Close()
 	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
 	dbt.DB().Ping()
-	record := 0           //交易总笔数
-	trans_amt_T := 0.0    //清算金额
-	true_fee_mod_T := 0.0 //清算手续费
-	trnrecont_T := 0.0    //结算总金额
+	rows, err = dbt.Raw("SELECT * FROM tran_logs WHERE mcht_cd = ? and trans_dt = ? and prod_cd = ? and tran_cd in (?)",
+		cf.MCHT_CD, cf.STLM_DATE, "1000", []string{"1151", "3151"}).Rows()
+	defer rows.Close()
+	if err == gorm.ErrRecordNotFound {
+		logr.Info("tbl_clear_txn not find: ", err)
+		return err
+	} else if err != nil {
+		logr.Info("tbl_clear_txn find fail: ", err)
+		return err
+	}
+
+	for rows.Next() {
+		tc := models.Tran_logs{}
+		dbc.ScanRows(rows, &tc)
+		cf.Tran_logs = append(cf.Tran_logs, tc)
+	}
+	//logr.Infof("Tran_logs: %+v", cf.Tran_logs)
+	*/
+	err = cf.saveDatatoFStru()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cf *CrtFunc1) saveDatatoFStru() error {
+	cf.FileStrt.FileBodys = []models.Body1{}
+	dbc := gormdb.GetInstance()
+	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
+	if err != nil {
+		logr.Info("open db err:", err)
+		return err
+	}
+	defer dbt.Close()
+	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
+	dbt.DB().Ping()
+	record := 0        //交易总笔数
+	trans_amt_T := 0.0 //清算金额
+
 	for _, tc := range cf.Tbl_Clear_Data {
-		b := models.Body{}
+		b := models.Body1{}
 		tfr := models.Tbl_tfr_his_trn_log{}
 		tran := models.Tran_logs{}
+		oritran := models.Tran_logs{}
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 		if err != nil {
 			logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
@@ -281,102 +294,112 @@ func (cf *CrtFile) saveDatatoFStru() {
 
 		record ++
 		a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
-		f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
-		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
-
 		trans_amt_T += a
-		true_fee_mod_T += f
-		trnrecont_T += m
 
-		b.MCHT_CD = tc.MCHT_CD
-		b.TRANS_DATE = tfr.TRANS_DT
-		b.TRANS_TIME = tfr.TRANS_MT
-		b.STLM_DATE = cf.STLM_DATE
-		b.TERM_ID = tc.TERM_ID
-		b.TRANS_KIND = tc.TXN_DESC
-		b.KEY_RSP = tc.KEY_RSP
-		b.PAN = tc.PAN
-		b.CARD_KIND_DIS = tc.CARD_KIND_DIS
-		b.TRANS_AMT = tc.TRANS_AMT
-		b.TRUE_FEE_MOD = tc.MCHT_FEE
-		b.MCHT_SET_AMT = tc.MCHT_SET_AMT
-		b.ERR_FEE_IN = "0"
-		b.ERR_FEE_OUT = "0"
+		//cf.TERM_ID = tc.TERM_ID
+		b.AMT = tc.TRANS_AMT
+		b.TYPE = tc.TXN_DESC
+		b.DATE = tfr.TRANS_DT[:4] + "-" + tfr.TRANS_DT[4:6] + "-" + tfr.TRANS_DT[6:]
+		b.POS_ID = tc.TERM_ID
+
+		SYS_ID := ""
 		logr.Info("prod_cd:", tfr.PROD_CD)
 		if tfr.PROD_CD == "1151" {
-			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
+			SYS_ID = tfr.INDUSTRY_ADDN_INF
 		} else {
 			if tfr.RETRI_REF_NO[:1] == cf.STLM_DATE[3:4] {
-				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
+				SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			} else {
-				b.SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
+				SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
 			}
 		}
-		b.INS_IN = "0"
-		b.INS_REAL_IN = "0"
-		b.INS_OUT = "0"
-		b.PROXY_CD = "0"
-		b.MEMBER_ID = "0"
-		b.DUES = tc.HZJG_FEE
-		b.PROD_CD = tfr.PROD_CD
-		b.TRAND_CD = tfr.MA_TRANS_CD
-		b.BIZ_CD = tfr.BIZ_CD
-		//"2017050415054098157697"
-		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
+
+		err = dbt.Where("sys_order_id = ?", SYS_ID).Find(&tran).Error
 		if err != nil {
-			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
+			logr.Info("tran_logs查询原始交易失败sys_order_id = %s\n", err)
 		}
-		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)
-		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
-		b.EXT_FLD = tran.Ext_fld7
+		logr.Infof("sys_order_id=%s, cust_order_id=%s", SYS_ID, tran.CUST_ORDER_ID)
+
+		b.TRACE_NO = tran.CUST_ORDER_ID
+		if tran.TRAN_CD == "3011" || tran.TRAN_CD == "2011" {
+			err = dbt.Where("sys_order_id = ?", tran.ORIG_SYS_ORDER_ID).Find(&oritran).Error
+			if err != nil {
+				logr.Info("tran_logs查询消费原始交易失败sys_order_id = %s\n", err)
+			}
+			u := strings.Split(strings.TrimSpace(oritran.Ext_fld7), "|")
+			if len(u) == 2 {
+				b.USER_NUMBER = u[0]
+				b.CHARGE_YEAR_ID = u[1]
+			}
+		} else {
+			u := strings.Split(strings.TrimSpace(tran.Ext_fld7), "|")
+			if len(u) == 2 {
+				b.USER_NUMBER = u[0]
+				b.CHARGE_YEAR_ID = u[1]
+			}
+		}
+
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 
-	//cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
-	cf.FileStrt.FileHeadInfo.Stlm_date = cf.STLM_DATE
-	cf.FileStrt.FileHeadInfo.TrnSucAm = strconv.FormatFloat(trans_amt_T, 'f', 2, 64)
-	cf.FileStrt.FileHeadInfo.TrnFeeT = strconv.FormatFloat(true_fee_mod_T, 'f', 2, 64)
-	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)
-	logr.Info("成功总笔数:", record)
+	/*
+	for _, tl := range cf.Tran_logs {
+		b := models.Body1{}
+		record ++
+		a, _ := strconv.ParseFloat(tl.TRAN_AMT, 64)
+		if tl.TRAN_CD == "1151" {
+			a /= 100
+		} else if tl.TRAN_CD == "3151" {
+			a /= 100
+			a *= (-1)
+			for _, tll := range cf.Tran_logs {
+				if tl.ORIG_SYS_ORDER_ID == tll.SYS_ORDER_ID {
+					tl.Ext_fld7 = tll.Ext_fld7
+				}
+			}
+		}
+		trans_amt_T += a
+
+		b.TRACE_NO = tl.CUST_ORDER_ID
+		b.AMT = strconv.FormatFloat(a, 'f', 2, 64)
+		b.TYPE = tl.TRAN_NM
+		b.DATE = tl.TRANS_DT[:4] + "-" + tl.TRANS_DT[4:6] + "-" + tl.TRANS_DT[6:]
+		b.POS_ID = tl.TERM_ID
+		u := strings.Split(strings.TrimSpace(tl.Ext_fld7), "|")
+		if len(u) == 2 {
+			b.USER_NUMBER = u[0]
+			b.CHARGE_YEAR_ID = u[1]
+		}
+		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
+	}
+	*/
 
 	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
+	cf.FileStrt.FileHeadInfo.TrnSucAm = strconv.FormatFloat(trans_amt_T, 'f', 2, 64)
+	logr.Info("成功总笔数:", record)
+
+	return nil
 }
 
-func (cf *CrtFile) GetInsIdCd() (string, bool) {
-	l := len(cf.Ins_id_cd)
-	if l == 0 {
-		return "", false
-	}
-
-	cf.MCHT_CD = cf.Ins_id_cd[0]
-	cf.Ins_id_cd = cf.Ins_id_cd[1:]
-	logr.Infof("取机构号：%s; 剩余机构号:%v", cf.MCHT_CD, cf.Ins_id_cd)
+func (cf *CrtFunc1) GetInsIdCd() (string, bool) {
+	logr.Infof("取机构号：%s", cf.MCHT_CD)
 
 	return cf.MCHT_CD, true
 }
 
-func (cf *CrtFile) geneFile() string {
-	cd, ok := cf.GetInsIdCd()
-	if ok {
-		cf.FileName = cf.FileName[:2] + cd
-	} else {
-		return ""
-	}
+func (cf *CrtFunc1) geneFile() string {
 
-	cf.FileName = cf.FileName + "_" + cf.STLM_DATE + ".txt"
+	cf.FileName = cf.FileName + cf.STLM_DATE + ".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
 }
 
-func (cf *CrtFile) InitMCHTCd(mc string) {
+func (cf *CrtFunc1) InitMCHTCd(mc string) {
 
 	//商户号
 	dbc := gormdb.GetInstance()
-	//rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows()
-	//rows, err := dbc.Raw("SELECT distinct MCHT_CD, mcht_ty FROM tbl_mcht_recon_list").Rows()
-	tbrec := models.Tbl_mcht_recon_list{}
-	err := dbc.Where("  MCHT_CD = ?", mc).Find(&tbrec).Error
+	err := dbc.Where("  MCHT_CD = ?", mc).Find(&cf.recon).Error
 
 	if err == gorm.ErrRecordNotFound {
 		logr.Info("dbc.Raw fail:%s\n", err)
@@ -386,12 +409,57 @@ func (cf *CrtFile) InitMCHTCd(mc string) {
 		logr.Info("dbc.Raw fail:%s\n", err)
 		return
 	}
-	logr.Info("对账配置表:%+v\n", tbrec)
+	logr.Info("对账配置表:%+v\n", cf.recon)
 	if mc != "" {
 		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
-		cf.MCHT_TP[mc] = tbrec.Mcht_ty
+		cf.MCHT_TP[mc] = cf.recon.Mcht_ty
 	}
 
 	logr.Info("初始化商户号:", cf.MCHT_TP)
 
+}
+
+func (cf *CrtFunc1) DoF587() error {
+	fn := "checkAccountF587"
+	req := &models.F587{}
+	req.SIGN_TYPE = "01"
+	area := models.F587_AREA{}
+	area.TRAN_CODE = "F587"
+	area.POS_ID = "0"
+	area.DATE = cf.STLM_DATE
+	area.FILE_NAME = cf.FileName
+	area.BANKNO = "01"
+	req.DATA_AREA = area
+	sig, err := req.BuilMsg(req.DATA_AREA)
+	if err != nil {
+		return err
+	}
+	logr.Infof("xml=%s", sig)
+	req.SIGN, err = req.SingUp(cf.dbtype, cf.dbstr, sig)
+	if err != nil {
+		return err
+	}
+	//logr.Debugf("F587=%+v", *req)
+	reqMsg, err := req.BuilMsg(req)
+	if err != nil {
+		return err
+	}
+	logr.Debugf("F587=%+v", string(reqMsg))
+	b, err := models.BuilSoap(fn, string(reqMsg))
+	if err != nil {
+		return err
+	}
+	//logr.Infof("BuilSoap xml=%s", b)
+	rsp, err := models.Comm(b)
+	if err != nil {
+		return err
+	}
+	//logr.Infof("BuilSoap  rsp xml=%s", rsp)
+	rs, err := models.LoadResp(rsp)
+	if err != nil {
+		return err
+	}
+	logr.Debugf("Resp=%s", rs)
+
+	return nil
 }

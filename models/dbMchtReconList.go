@@ -7,7 +7,7 @@ type Tbl_mcht_recon_list struct {
 	HOST       string `gorm:"column:host"`
 	PORT       string `gorm:"column:port"`
 	REMOTE_DIR string `gorm:"column:remote_dir"`
-	MCHT_TP    string `gorm:"column:mcht_tp"`
+	Mcht_ty    string `gorm:"column:mcht_ty"`
 	Transp_ty  string `gorm:"column:transp_ty"`
 	EXT1       string `gorm:"column:EXT1"`
 	EXT2       string `gorm:"column:EXT2"`
