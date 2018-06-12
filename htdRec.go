@@ -32,11 +32,11 @@ func main() {
 
 	flag.Parse()
 
-	//args := os.Args //获取用户输入的所有参数
-	//if args == nil || len(args) < 2 || len(args[1]) != 8 {
-	//	fmt.Println(`请带一个格式为: [20161119]的查询日期参数！`)
-	//	return
-	//}
+	args := os.Args //获取用户输入的所有参数
+	if args == nil || len(args) < 2 || len(args[1]) != 8 {
+		fmt.Println(`请带一个格式为: [20161119]的查询日期参数！`)
+		return
+	}
 
 	initParam := run.InitParams{}
 
@@ -88,8 +88,8 @@ func main() {
 
 	for _, task := range g_taskList {
 		ac := task.Action
-		//task.Name = args[1] //清算日期
-		task.Name = "20180514"
+		task.Name = args[1] //清算日期
+		//task.Name = "20180514"
 		err = ac.Init(initParam, task.Name)
 		if err != nil {
 			logr.Info("初始化失败: ", task.Name, err)
