@@ -3,8 +3,7 @@ package reconc
 import (
 	"golib/gerror"
 	"golib/modules/gormdb"
- 	"github.com/jinzhu/gorm"
-	"os"
+	"github.com/jinzhu/gorm"
 	"htdRec/models"
 	"golib/modules/config"
 	"bufio"
@@ -18,6 +17,7 @@ import (
 	"htdRec/myftp"
 	"golib/security"
 	"time"
+	"os"
 )
 
 type CrtFile struct {
@@ -73,27 +73,28 @@ func (cf *CrtFile) indb() {
 }
 
 func (cf *CrtFile) Run() {
-	//for {
-	//	if len(cf.Ins_id_cd) == 0 {
-	//		return
-	//	}
-	//	cf.SaveToFile()
-	//}
-	cf.SaveToFile()
+
+	gerr := cf.SaveToFile()
+	if gerr != nil {
+		logr.Errorf("%s", gerr)
+	}
 	return
 }
-func (cf *CrtFile) SaveToFile() {
-	fp := cf.geneFile()
-	logr.Info("对账文件路径：", fp)
-	f, err := os.Create(fp)
+func (cf *CrtFile) SaveToFile() gerror.IError {
+	//读数据
+	gerr := cf.ReadDate()
+	if gerr != nil {
+		logr.Info("未读到清算数据,不创建对账文件MCHT_CD:", cf.MCHT_CD)
+		return gerr
+	}
+	//创建文件
+	fn := cf.geneFile()
+	logr.Info("对账文件路径：", fn)
+	f, err := os.Create(fn)
 	defer f.Close()
 	if err != nil {
-		logr.Info(cf.FileName, err)
-		return
+		return gerror.NewR(1001, err, "创建文件失败:%s", fn)
 	}
-
-	//读数据
-	cf.ReadDate()
 	buf := []byte{}
 	b := bytes.NewBuffer(buf)
 
@@ -131,6 +132,7 @@ func (cf *CrtFile) SaveToFile() {
 	//fmt.Println("---读取的buf数据--:", buf)
 	w.Flush()
 	f.Sync()
+	return nil
 }
 
 func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
@@ -200,7 +202,7 @@ func (cf *CrtFile) Finish() {
 	return
 }
 
-func (cf *CrtFile) ReadDate() {
+func (cf *CrtFile) ReadDate() gerror.IError {
 	dbc := gormdb.GetInstance()
 	var rows *sql.Rows
 	var err error
@@ -210,57 +212,45 @@ func (cf *CrtFile) ReadDate() {
 	} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
 		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
 	} else {
-		return
+		return nil
 	}
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		logr.Info("tbl_clear_txn not find: ", err)
-		return
+		return gerror.NewR(0000, err, "MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
 	if err != nil {
 		logr.Info("tbl_clear_txn find fail: ", err)
-		return
+		return gerror.NewR(1000, err, " ")
 	}
-	//cf.Tbl_Clear_Data = make([]models.Tbl_clear_txn, 0)
-	cf.Tbl_Clear_Data = []models.Tbl_clear_txn{}
-	//record := 0           //交易总笔数
-	//trans_amt_T := 0.0    //清算金额
-	//true_fee_mod_T := 0.0 //清算手续费
-	//trnrecont_T := 0.0    //结算总金额
-	//INS_ID_CD := "0"
+	//cf.Tbl_Clear_Data = []models.Tbl_clear_txn{}
+
 	for rows.Next() {
-		//record ++
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
-		//
-		//a, _ := strconv.ParseFloat(tc.TRANS_AMT, 64)
-		//f, _ := strconv.ParseFloat(tc.MCHT_FEE, 64)
-		//m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
-		//
-		//trans_amt_T += a
-		//true_fee_mod_T += f
-		//trnrecont_T += m
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
 	}
-	//fmt.Println(trans_amt_T, true_fee_mod_T, trnrecont_T)
 	//处理文件头
 	if len(cf.Tbl_Clear_Data) > 0 {
 		cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.Tbl_Clear_Data[0].INS_ID_CD
+	} else {
+		return gerror.NewR(0000, err, "MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
-	//cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.MCHT_CD
 
-	cf.saveDatatoFStru()
-
+	gerr := cf.saveDatatoFStru()
+	if gerr != nil {
+		return gerr
+	}
+	return nil
 }
 
-func (cf *CrtFile) saveDatatoFStru() {
+func (cf *CrtFile) saveDatatoFStru() gerror.IError {
 	//cf.FileStrt.FileBodys = make([]models.Body,0)
 	cf.FileStrt.FileBodys = []models.Body{}
 	dbc := gormdb.GetInstance()
 	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
 		logr.Info(err)
-		return
+		return gerror.NewR(1000, err, "打开数据库链接失败")
 	}
 	defer dbt.Close()
 	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
@@ -340,6 +330,7 @@ func (cf *CrtFile) saveDatatoFStru() {
 	logr.Info("成功总笔数:", record)
 
 	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
+	return nil
 }
 
 func (cf *CrtFile) GetInsIdCd() (string, bool) {

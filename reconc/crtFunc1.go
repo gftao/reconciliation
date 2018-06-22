@@ -86,6 +86,12 @@ func (cf *CrtFunc1) Run() {
 }
 
 func (cf *CrtFunc1) SaveToFile() error {
+	//读数据
+	err := cf.ReadDate()
+	if err != nil {
+		return err
+	}
+	//读取数据成功，创建文件
 	fp := cf.geneFile()
 	logr.Info("对账文件路径：", fp)
 	f, err := os.Create(fp)
@@ -95,11 +101,6 @@ func (cf *CrtFunc1) SaveToFile() error {
 		return err
 	}
 
-	//读数据
-	err = cf.ReadDate()
-	if err != nil {
-		return err
-	}
 	buf := []byte{}
 	b := bytes.NewBuffer(buf)
 	b.WriteString(cf.FileStrt.HToString())
@@ -111,11 +112,11 @@ func (cf *CrtFunc1) SaveToFile() error {
 		b.WriteString("\r\n")
 	}
 	rb := b.Bytes()
-	logr.Infof("--读取的数据2---[%s]", string(rb))
+	logr.Infof("<<读取的数据>>[%s]", string(rb))
 
 	err = cf.postToSftp(cf.FileName, rb)
 	if err != nil {
-		return err
+		logr.Error(err)
 	}
 
 	w := bufio.NewWriter(f) //创建新的 Writer 对象
@@ -232,34 +233,9 @@ func (cf *CrtFunc1) ReadDate() error {
 
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
 	}
-	/*
-	//云流水表数据
-	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
-	if err != nil {
-		logr.Info("open db err:", err)
-		return err
+	if len(cf.Tbl_Clear_Data) <= 0 {
+		return fmt.Errorf("MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
-	defer dbt.Close()
-	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
-	dbt.DB().Ping()
-	rows, err = dbt.Raw("SELECT * FROM tran_logs WHERE mcht_cd = ? and trans_dt = ? and prod_cd = ? and tran_cd in (?)",
-		cf.MCHT_CD, cf.STLM_DATE, "1000", []string{"1151", "3151"}).Rows()
-	defer rows.Close()
-	if err == gorm.ErrRecordNotFound {
-		logr.Info("tbl_clear_txn not find: ", err)
-		return err
-	} else if err != nil {
-		logr.Info("tbl_clear_txn find fail: ", err)
-		return err
-	}
-
-	for rows.Next() {
-		tc := models.Tran_logs{}
-		dbc.ScanRows(rows, &tc)
-		cf.Tran_logs = append(cf.Tran_logs, tc)
-	}
-	//logr.Infof("Tran_logs: %+v", cf.Tran_logs)
-	*/
 	err = cf.saveDatatoFStru()
 	if err != nil {
 		return err

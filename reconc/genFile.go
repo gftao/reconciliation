@@ -98,7 +98,7 @@ func (g *GenFile) GetMCHTCd() (string, bool) {
 
 	g.MCHT_CD = g.MCHT_CDS[0]
 	g.MCHT_CDS = g.MCHT_CDS [1:]
-	logr.Infof("取机构号：%s; 剩余机构号:%v", g.MCHT_CD, g.MCHT_CDS)
+	logr.Infof("取机构号 :%s; 剩余机构号:%v", g.MCHT_CD, g.MCHT_CDS)
 
 	return g.MCHT_CD, true
 }
