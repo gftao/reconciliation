@@ -8,7 +8,6 @@
       <root url="file://D:/go/src/gopkg.in" />
       <root url="file://D:/go/src/github.com" />
     </CLASSES>
-    <JAVADOC />
     <SOURCES>
       <root url="file://$PROJECT_DIR$/../prodPmp" />
       <root url="file://D:/go/src/golib" />
