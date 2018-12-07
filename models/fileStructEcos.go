@@ -43,18 +43,16 @@ func (f FileStrtEchos) ToString() string {
 	v := reflect.ValueOf(f)
 	strs := []string{}
 	for i := 0; i < t.NumField(); i++ {
-		//if t.Field(i).Name == "PAN" {
-		//	vi := v.Field(i).String()
-		//	if vi == "0" {
-		//		vi = ""
-		//	}
-		//	//strs = append(strs, fmt.Sprintf("%-#16s", vi))
-		//	//strs = append(strs, v.Field(i).String())
-		//} else {
-		//	strs = append(strs, v.Field(i).String())
-		//}
-		strs = append(strs, v.Field(i).String())
-	}
+		if t.Field(i).Name == "PAN" {
+			vi := v.Field(i).String()
+			if vi == "0" {
+				vi = ""
+			}
+ 			strs = append(strs, vi)
+		} else {
+			strs = append(strs, v.Field(i).String())
+		}
+ 	}
 	s := strings.Join(strs, "||")
 	return s
 }

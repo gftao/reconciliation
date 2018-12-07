@@ -10,7 +10,6 @@ import (
 	"os"
 	"bytes"
 	"bufio"
-	"database/sql"
 	"strings"
 	"golib/security"
 	"htdRec/myfstp"
@@ -29,7 +28,7 @@ type Ecosph struct {
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
 	dbstr                string
-	MCHT_TP              map[string]string
+	MCHT_TP              string // map[string]string
 	sendto               bool
 }
 
@@ -39,7 +38,7 @@ func (cf *Ecosph) Init(chainName string, mc string) gerror.IError {
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
 	cf.STLM_DATE = chainName //清算日期
-	cf.MCHT_TP = make(map[string]string, 1)
+	//cf.MCHT_TP = make(map[string]string, 1)
 	cf.MCHT_CD = mc
 	err := cf.InitMCHTCd(mc)
 	if err != nil {
@@ -80,12 +79,13 @@ func (cf *Ecosph) InitMCHTCd(mc string) gerror.IError {
 		return gerror.NewR(1000, err, "商户[%s]对账信息查询失败:%s", mc, err)
 	}
 	logr.Infof("商户对账配置表:%+v\n", tbrec)
-	if mc != "" {
-		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
-		cf.MCHT_TP[mc] = tbrec.Mcht_ty
-	}
 
-	logr.Info("初始化商户号:", cf.MCHT_TP)
+	for _, c := range strings.Split(tbrec.EXT4, ",") {
+		cf.Ins_id_cd = append(cf.Ins_id_cd, c)
+
+	}
+	cf.MCHT_TP = tbrec.Mcht_ty
+	logr.Infof("初始化商户号:[%+v][%s]", cf.Ins_id_cd, cf.MCHT_TP)
 	return nil
 }
 
@@ -143,29 +143,25 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 
 func (cf *Ecosph) ReadDate() gerror.IError {
 	dbc := gormdb.GetInstance()
-	var rows *sql.Rows
-	var err error
-	logr.Info(cf.MCHT_CD, "->", cf.MCHT_TP[cf.MCHT_CD])
-	if cf.MCHT_TP[cf.MCHT_CD] == "0" {
-		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
-	} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
-		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
-	} else {
-		return nil
-	}
-	defer rows.Close()
-	if err == gorm.ErrRecordNotFound {
-		return gerror.NewR(0000, err, "商户[%s]没有对账数据", cf.MCHT_CD)
-	}
-	if err != nil {
-		logr.Info("查商户[%s]对账数据失败:%s", cf.MCHT_CD, err)
-		return gerror.NewR(1000, err, "查商户[%s]对账数据失败:%s", cf.MCHT_CD, err)
-	}
 
-	for rows.Next() {
-		tc := models.Tbl_clear_txn{}
-		dbc.ScanRows(rows, &tc)
-		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
+	for _, mc := range cf.Ins_id_cd {
+		logr.Info("生态圈商户号->", mc)
+		rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", mc, cf.STLM_DATE).Rows()
+		defer rows.Close()
+		if err == gorm.ErrRecordNotFound {
+ 			logr.Info("商户[%s]没有对账数据",mc)
+			continue
+		}
+		if err != nil {
+			logr.Info("查商户[%s]对账数据失败:%s", cf.MCHT_CD, err)
+			return gerror.NewR(1000, err, "查商户[%s]对账数据失败:%s", cf.MCHT_CD, err)
+		}
+
+		for rows.Next() {
+			tc := models.Tbl_clear_txn{}
+			dbc.ScanRows(rows, &tc)
+			cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
+		}
 	}
 
 	gerr := cf.saveDatatoFStru()
@@ -242,12 +238,12 @@ func (cf *Ecosph) saveDatatoFStru() gerror.IError {
 }
 
 func (cf *Ecosph) geneFile() string {
-	_, ok := cf.GetInsIdCd()
-	if ok {
-		cf.FileName = cf.FileName[:12]
-	} else {
-		return ""
-	}
+	//_, ok := cf.GetInsIdCd()
+	//if ok {
+	//	cf.FileName = cf.FileName[:12]
+	//} else {
+	//	return ""
+	//}
 
 	cf.FileName = cf.FileName + cf.STLM_DATE[2:] + "_01.txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
