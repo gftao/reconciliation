@@ -7,11 +7,9 @@ import (
 	"prodPmpCld/global"
 	"htdRec/reconc"
 	"golib/modules/logr"
-	"os"
 	"fmt"
 	"flag"
-	"runtime/pprof"
-	"runtime"
+	"os"
 )
 
 type TaskList struct {
@@ -24,9 +22,6 @@ var g_taskList []TaskList = []TaskList{
 	//{"CRTFILE", &reconc.CrtFile{}},
 	{"YCRL", &reconc.GenFile{}},
 }
-
-var cpuprofile = flag.String("C", "cpu.prof", "write cpu profile `file`")
-var memprofile = flag.String("M", "mem.prof", "write memory profile to `file")
 
 func main() {
 
@@ -43,12 +38,10 @@ func main() {
 	err := config.InitModuleByParams(global.CONFIGFILE)
 	if err != nil {
 		fmt.Println("读取配置文件失败", global.CONFIGFILE, err)
-		//logr.Info("读取配置文件失败", global.CONFIGFILE, err)
-		return
+ 		return
 	}
 
-	//logr.Info("开始初始化日志")
-	err = logr.InitModules()
+ 	err = logr.InitModules()
 	if err != nil {
 		logr.Info("初始化日志失败", err)
 		return
@@ -60,43 +53,19 @@ func main() {
 		logr.Info("初始化数据库失败", err)
 		return
 	}
-	pp := config.BoolDefault("prof", false)
-	if pp {
-		if *cpuprofile != "" {
-			f, err := os.Create(*cpuprofile)
-			if err != nil {
-				logr.Error("could not create CPU profile: ", err)
-			}
-			if err = pprof.StartCPUProfile(f); err != nil {
-				logr.Error("could not Start CPU profile: ", err)
-			}
-			defer pprof.StopCPUProfile()
-		}
-		if *memprofile != "" {
-			f, err := os.Create(*memprofile)
-			if err != nil {
-				logr.Error("could not create memory profile: ", err)
-			}
-			runtime.GC()
-			if err = pprof.WriteHeapProfile(f); err != nil {
-				logr.Error("could not  write memory profile: ", err)
-			}
-
-			f.Close()
-		}
-	}
 
 	for _, task := range g_taskList {
 		ac := task.Action
 		task.Name = args[1] //清算日期
-		//task.Name = "20180514"
+		//task.Name = "20181114"
+		//task.Name = "20181206"
+
 		err = ac.Init(initParam, task.Name)
 		if err != nil {
 			logr.Info("初始化失败: ", task.Name, err)
 			return
 		}
-		//fmt.Println(task.Name + "初始化成功")
-	}
+ 	}
 
 	for _, task := range g_taskList {
 		ac := task.Action
@@ -107,5 +76,4 @@ func main() {
 
 	logr.Info("----main end!------")
 	//runtime.Goexit()
-
 }

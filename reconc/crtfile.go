@@ -50,7 +50,10 @@ func (cf *CrtFile) Init(chainName string, mc string) gerror.IError {
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.MCHT_CD = mc
-	cf.InitMCHTCd(mc)
+	err := cf.InitMCHTCd(mc)
+	if err != nil {
+		return err
+	}
 	cf.indb()
 	return nil
 }
@@ -98,9 +101,6 @@ func (cf *CrtFile) SaveToFile() gerror.IError {
 	buf := []byte{}
 	b := bytes.NewBuffer(buf)
 
-	//fmt.Printf("头标识：%s\n",cf.FileStrt.FileHead)
-	b.WriteString(cf.FileStrt.FileHead)
-	b.WriteString("\r\n")
 	b.WriteString(cf.FileStrt.HToString())
 	b.WriteString("\r\n")
 
@@ -360,7 +360,7 @@ func (cf *CrtFile) geneFile() string {
 	return p
 }
 
-func (cf *CrtFile) InitMCHTCd(mc string) {
+func (cf *CrtFile) InitMCHTCd(mc string) gerror.IError {
 
 	//商户号
 	dbc := gormdb.GetInstance()
@@ -370,12 +370,12 @@ func (cf *CrtFile) InitMCHTCd(mc string) {
 	err := dbc.Where("  MCHT_CD = ?", mc).Find(&tbrec).Error
 
 	if err == gorm.ErrRecordNotFound {
-		logr.Info("dbc.Raw fail:%s\n", err)
-		return
+		logr.Infof("商户[%s]对账信息未配置:%s\n", mc, err)
+		return gerror.NewR(1000, err, "商户[%s]对账信息未配置:%s", mc, err)
 	}
 	if err != nil {
-		logr.Info("dbc.Raw fail:%s\n", err)
-		return
+		logr.Infof("商户[%s]对账信息查询失败:%s\n", mc, err)
+		return gerror.NewR(1000, err, "商户[%s]对账信息查询失败:%s", mc, err)
 	}
 	logr.Info("对账配置表:%+v\n", tbrec)
 	if mc != "" {
@@ -384,5 +384,5 @@ func (cf *CrtFile) InitMCHTCd(mc string) {
 	}
 
 	logr.Info("初始化商户号:", cf.MCHT_TP)
-
+	return nil
 }

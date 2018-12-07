@@ -24,7 +24,7 @@ type GenFile struct {
 
 func (g *GenFile) Init(initParams run.InitParams, chainName string) gerror.IError {
 	g.STLM_DATE = chainName //清算日期
-	g.MCHT_RECTY = make(map[string]string, 1)
+	g.MCHT_RECTY = make(map[string]string)
 	err := g.InitMCHTCd()
 	if err != nil {
 		return gerror.NewR(1001, err, "无记录")
@@ -41,8 +41,10 @@ func (g *GenFile) Run() {
 		}
 		logr.Infof("根据商户号注册方法:%s", g.MCHT_RECTY[cd])
 		switch g.MCHT_RECTY[cd] {
-		case "1"://银川热力专用
+		case "1": //银川热力专用
 			g.Action = &CrtFunc1{}
+		case "2": //【生态圈】POS对账文件说明
+			g.Action = &Ecosph{}
 		default:
 			g.Action = &CrtFile{}
 		}
@@ -58,13 +60,11 @@ func (g *GenFile) Finish() {
 }
 
 func (g *GenFile) InitMCHTCd() error {
-
-	//商户号
 	mc, ok := config.String("MCHT_CD")
 	if ok && mc != "" {
 		g.MCHT_CDS = append(g.MCHT_CDS, mc)
 		mt := config.StringDefault("MCHT_RECTY", "0")
-		logr.Infof("读配置文件%s,%s", mc, mt)
+		logr.Infof("读配置文件:%s,%s", mc, mt)
 		g.MCHT_RECTY[mc] = mt
 		return nil
 	}
@@ -98,7 +98,7 @@ func (g *GenFile) GetMCHTCd() (string, bool) {
 
 	g.MCHT_CD = g.MCHT_CDS[0]
 	g.MCHT_CDS = g.MCHT_CDS [1:]
-	logr.Infof("取机构号 :%s; 剩余机构号:%v", g.MCHT_CD, g.MCHT_CDS)
+	logr.Infof("取机构号:%s; 剩余机构号:%v", g.MCHT_CD, g.MCHT_CDS)
 
 	return g.MCHT_CD, true
 }
