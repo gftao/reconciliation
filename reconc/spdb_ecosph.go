@@ -33,7 +33,7 @@ type Ecosph struct {
 }
 
 func (cf *Ecosph) Init(chainName string, mc string) gerror.IError {
-	cf.FileName = "SPDB_STQTXN_"
+	cf.FileName = "stqtxn_"
 	cf.FilePath = config.StringDefault("filePath", "")
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
@@ -149,7 +149,7 @@ func (cf *Ecosph) ReadDate() gerror.IError {
 		rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", mc, cf.STLM_DATE).Rows()
 		defer rows.Close()
 		if err == gorm.ErrRecordNotFound {
- 			logr.Info("商户[%s]没有对账数据",mc)
+			logr.Info("商户[%s]没有对账数据", mc)
 			continue
 		}
 		if err != nil {
@@ -245,7 +245,7 @@ func (cf *Ecosph) geneFile() string {
 	//	return ""
 	//}
 
-	cf.FileName = cf.FileName + cf.STLM_DATE[2:] + "_01.txt"
+	cf.FileName = cf.FileName + cf.STLM_DATE
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
