@@ -100,7 +100,7 @@ func (cf *CrtFile) SaveToFile() gerror.IError {
 	}
 	buf := []byte{}
 	b := bytes.NewBuffer(buf)
-
+	b.WriteString(cf.FileStrt.FileHead + "\r\n")
 	b.WriteString(cf.FileStrt.HToString())
 	b.WriteString("\r\n")
 
