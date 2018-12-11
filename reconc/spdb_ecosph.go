@@ -228,7 +228,11 @@ func (cf *Ecosph) saveDatatoFStru() gerror.IError {
 			logr.Info("查询sys_order_id失败:%s\n", err)
 		}
 		logr.Infof("sys_order_id=%s, cust_order_id=%s", sysId, tran.CUST_ORDER_ID)
-		b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
+		if strings.HasPrefix(tran.CUST_ORDER_ID, "spdb_ecosph") {
+			b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
+		} else {
+			continue
+		}
 
 		b.Stl_flag = "0"
 		cf.FileStrt = append(cf.FileStrt, b)
@@ -238,13 +242,6 @@ func (cf *Ecosph) saveDatatoFStru() gerror.IError {
 }
 
 func (cf *Ecosph) geneFile() string {
-	//_, ok := cf.GetInsIdCd()
-	//if ok {
-	//	cf.FileName = cf.FileName[:12]
-	//} else {
-	//	return ""
-	//}
-
 	cf.FileName = cf.FileName + cf.STLM_DATE
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
@@ -307,7 +304,14 @@ func (cf *Ecosph) postToSftp(fileName string, fileData []byte) {
 			switch trans_ty {
 			case "0":
 				logr.Infof("SFTP:")
-				myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+				err = myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+				if err != nil {
+					logr.Error(err)
+				}
+				err = myfstp.PosByteSftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				if err != nil {
+					logr.Error(err)
+				}
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
