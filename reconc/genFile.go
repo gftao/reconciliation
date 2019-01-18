@@ -45,6 +45,8 @@ func (g *GenFile) Run() {
 			g.Action = &CrtFunc1{}
 		case "2": //【生态圈】POS对账文件说明
 			g.Action = &Ecosph{}
+		case "3"://中法供水
+			g.Action = &SinoFrench{}
 		default:
 			g.Action = &CrtFile{}
 		}
