@@ -35,7 +35,7 @@ type SinoFrench struct {
 }
 
 func (cf *SinoFrench) Init(chainName string, mc string) gerror.IError {
-	cf.FileName = "SPDB_"
+	cf.FileName = "spdb02_"
 	cf.FilePath = config.StringDefault("filePath", "")
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
@@ -179,7 +179,7 @@ func (cf *SinoFrench) ReadDate() gerror.IError {
 }
 
 func (cf *SinoFrench) geneFile() string {
-	cf.FileName = cf.FileName + cf.STLM_DATE
+	cf.FileName = cf.FileName + cf.STLM_DATE + ".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
@@ -233,8 +233,8 @@ func (cf *SinoFrench) saveDatatoFStru() gerror.IError {
 		logr.Infof("sys_order_id=%s, cust_order_id=%s", sysId, tran.CUST_ORDER_ID)
 		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
 
-		b.Regist_Meter_No = "注册号"
-		b.Amount = "水量"
+		//b.Regist_Meter_No = "注册号"
+		//b.Amount = "水量"
 
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
