@@ -48,11 +48,11 @@ type Tbl_clear_txn struct {
 	VAR_5               string `gorm:"column:VAR_5"`
 	MCHT_VIR_FEE        string `gorm:"column:MCHT_VIR_FEE"`
 	STAND_BANK_FEE      string `gorm:"column:STAND_BANK_FEE"`
-	BANK_FEE            string `gorm:"column:BANK_FEE"`
-	HZJG_FEE            string `gorm:"column:HZJG_FEE"` //应付费用
+	BANK_FEE            string `gorm:"column:BANK_FEE"` //银行手续费
+	HZJG_FEE            string `gorm:"column:HZJG_FEE"` //应付费用（万分之一，1块钱封顶）
 	JGSY                string `gorm:"column:JGSY"`
 	AIP_FEE             string `gorm:"column:AIP_FEE"`
-	MCHT_SET_AMT        string `gorm:"column:MCHT_SET_AMT"`    //交易结算资金
+	MCHT_SET_AMT        string `gorm:"column:MCHT_SET_AMT"`    //交易结算资金（金额-商户手续费）
 	HZJGYFPPFWF         string `gorm:"column:HZJGYFPPFWF"`
 	JGYFPPFWF           string `gorm:"column:JGYFPPFWF"`
 	AIPYFPPFWF          string `gorm:"column:AIPYFPPFWF"`
@@ -79,7 +79,7 @@ type Tbl_clear_txn struct {
 	UP_CHL_ID           string `gorm:"column:UP_CHL_ID"`
 	CONV_MCHT_CD        string `gorm:"column:CONV_MCHT_CD"`
 	CONV_TERM_ID        string `gorm:"column:CONV_TERM_ID"`
-	CHL_TRUE_FEE        string `gorm:"column:CHL_TRUE_FEE"`
+	CHL_TRUE_FEE        string `gorm:"column:CHL_TRUE_FEE"`//渠道手续费= 银行手续费
 	CHL_STD_FEE         string `gorm:"column:CHL_STD_FEE"`
 	CHL_FEE_PRE_FLG     string `gorm:"column:CHL_FEE_PRE_FLG"`
 	SYS_SER             string `gorm:"column:SYS_SER"`         //系统流水号

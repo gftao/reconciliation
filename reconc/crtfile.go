@@ -34,6 +34,7 @@ type CrtFile struct {
 	dbstr                string
 	MCHT_TP              map[string]string
 	sendto               bool
+	empty                bool
 }
 
 func (cf *CrtFile) Init(chainName string, mc string) gerror.IError {
@@ -215,7 +216,8 @@ func (cf *CrtFile) ReadDate() gerror.IError {
 		return nil
 	}
 	defer rows.Close()
-	if err == gorm.ErrRecordNotFound {
+
+	if err == gorm.ErrRecordNotFound && !cf.empty {
 		return gerror.NewR(0000, err, "MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
 	if err != nil {
@@ -232,6 +234,8 @@ func (cf *CrtFile) ReadDate() gerror.IError {
 	//处理文件头
 	if len(cf.Tbl_Clear_Data) > 0 {
 		cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.Tbl_Clear_Data[0].INS_ID_CD
+	} else if cf.empty {
+		cf.FileStrt.FileHeadInfo.INS_ID_CD = cf.MCHT_CD
 	} else {
 		return gerror.NewR(0000, err, "MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
@@ -381,6 +385,11 @@ func (cf *CrtFile) InitMCHTCd(mc string) gerror.IError {
 	if mc != "" {
 		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
 		cf.MCHT_TP[mc] = tbrec.Mcht_ty
+	}
+	if strings.ContainsAny(tbrec.EXT3, "[]") {
+		tbrec.EXT3 = strings.Trim(tbrec.EXT3, "[]")
+		v := strings.Split(tbrec.EXT3, ",")
+		cf.empty = v[0] == "1"
 	}
 
 	logr.Info("初始化商户号:", cf.MCHT_TP)
