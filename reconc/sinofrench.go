@@ -212,6 +212,7 @@ func (cf *SinoFrench) saveDatatoFStru() gerror.IError {
 
 		trans_amt_T += a
 		b.TERM_ID = tc.TERM_ID
+		b.Net_No = tc.MCHT_CD
 		logr.Info("prod_cd:", tfr.PROD_CD)
 		var sysId string
 		if tfr.PROD_CD == "1151" {
