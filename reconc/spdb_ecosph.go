@@ -156,10 +156,15 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	for rows.Next() {
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
-
+		if tc.KEY_RSP == "" {
+			continue
+		}
 		b, gerr := cf.saveDatatoFStru(&tc)
 		if gerr != nil {
 			return gerr
+		}
+		if b == nil {
+			continue
 		}
 		logr.Infof("%s", b.ToString()+"\n")
 		fp.WriteString(b.ToString() + "\n")
@@ -178,9 +183,12 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 	b := models.FileStrtEchos{}
 	tfr := models.Tbl_tfr_his_trn_log{}
 	tran := models.Tran_logs{}
+
 	err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
 	if err != nil {
-		//logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
 		return nil, gerror.NewR(1000, err, "dbc find failed, KEY_RSP %s failed", tc.KEY_RSP)
 	}
 
@@ -221,14 +229,9 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 	logr.Infof("sys_order_id=%s, cust_order_id=%s", sysId, tran.CUST_ORDER_ID)
 	if strings.HasPrefix(tran.CUST_ORDER_ID, "spdb_ecosph") {
 		b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
-	} else {
-		//b.CUST_ORDER_ID = ""
 	}
 
 	b.Stl_flag = "0"
-
-	//cf.FileStrt = append(cf.FileStrt, b)
-
 	return &b, nil
 }
 
