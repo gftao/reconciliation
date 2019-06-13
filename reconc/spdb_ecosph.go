@@ -117,7 +117,6 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 	if err != nil {
 		return gerror.NewR(1001, err, "创建文件失败:%s", fn)
 	}
-
 	//读数据
 	gerr := cf.ReadDate(f)
 	if gerr != nil {
@@ -131,11 +130,9 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 		return gerror.NewR(1004, err, "打开文件失败:%s", fn)
 	}
 	defer fp.Close()
-	/////////
+
 	f.Seek(0, 0)
 	cf.postToSftp(cf.FileName, fp)
-
-	/////////
 
 	return nil
 }
@@ -143,7 +140,7 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? limit 100", cf.STLM_DATE).Rows()
+	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? limit 300", cf.STLM_DATE).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
@@ -151,11 +148,11 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	if err != nil {
 		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
 	}
-	logr.Infof("--读取生态圈数据---[")
-
+	logr.Infof("--读取生态圈数据---")
 	for rows.Next() {
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
+		logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
 		if tc.KEY_RSP == "" {
 			continue
 		}
@@ -191,16 +188,12 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 	if err != nil {
 		return nil, gerror.NewR(1000, err, "dbc find failed, KEY_RSP %s failed", tc.KEY_RSP)
 	}
-
 	b.Stlm_date = cf.STLM_DATE
 	b.MCHT_CD = tc.MCHT_CD
 	b.TERM_ID = tc.TERM_ID
 	b.TRANS_TIME = tfr.TRANS_DT[4:] + tfr.TRANS_MT
 	b.PAN = tc.PAN
-	//b.KEY_RSP = tc.KEY_RSP
 	b.Resp_cd = "00"
-
-	logr.Info("prod_cd:", tfr.PROD_CD)
 	var sysId string
 	if tfr.PROD_CD == "1151" {
 		sysId = tfr.INDUSTRY_ADDN_INF
@@ -213,6 +206,7 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 		}
 	}
 	b.KEY_RSP = sysId
+
 	b.CARD_KIND_DIS = models.CARDConvert[tfr.BIZ_CD]
 	b.TRAND_CD = tfr.MA_TRANS_CD
 	switch b.TRAND_CD[:1] {
@@ -226,11 +220,10 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 	if err != nil {
 		logr.Info("查询sys_order_id[%s]失败:%s\n", sysId, err)
 	}
-	logr.Infof("sys_order_id=%s, cust_order_id=%s", sysId, tran.CUST_ORDER_ID)
+	logr.Infof("KEY_RSP=%s,sys_order_id=%s, cust_order_id=%s", tc.KEY_RSP, sysId, tran.CUST_ORDER_ID)
 	if strings.HasPrefix(tran.CUST_ORDER_ID, "spdb_ecosph") {
 		b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
 	}
-
 	b.Stl_flag = "0"
 	return &b, nil
 }
