@@ -143,8 +143,7 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
-	logr.Info("生态圈商户号->")
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  STLM_DATE = ? limit 100", cf.STLM_DATE).Rows()
+	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? limit 100", cf.STLM_DATE).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
