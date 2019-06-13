@@ -18,16 +18,18 @@ import (
 	"strconv"
 	"strings"
 	"golib/modules/logr"
+
+	"io"
 )
 
 func connect(user, password, host string, port int) (*sftp.Client, error) {
 	var (
 		auth         []ssh.AuthMethod
-		addr string
+		addr         string
 		clientConfig *ssh.ClientConfig
 		sshClient    *ssh.Client
 		sftpClient   *sftp.Client
-		err error
+		err          error
 	)
 	// get auth method
 	auth = make([]ssh.AuthMethod, 0)
@@ -55,7 +57,7 @@ func connect(user, password, host string, port int) (*sftp.Client, error) {
 
 func PosSftp(user, password, host, port, filePath, rmtDir string) error {
 	var (
-		err error
+		err        error
 		sftpClient *sftp.Client
 	)
 
@@ -98,7 +100,7 @@ func PosSftp(user, password, host, port, filePath, rmtDir string) error {
 
 func PosByteSftp(user, password, host, port, fileName, rmtDir string, fileData []byte) error {
 	var (
-		err error
+		err        error
 		sftpClient *sftp.Client
 	)
 
@@ -134,5 +136,38 @@ func PosByteSftp(user, password, host, port, fileName, rmtDir string, fileData [
 		}
 	}
 	logr.Info("copy file to remote server finished!")
+	return nil
+}
+
+func PosIOSftp(user, password, host, port, fileName, rmtDir string, fileData io.Reader) error {
+	var (
+		err        error
+		sftpClient *sftp.Client
+	)
+
+	// 这里换成实际的 SSH 连接的 用户名，密码，主机名或IP，SSH端口
+	p, _ := strconv.Atoi(port)
+	sftpClient, err = connect(user, password, host, p)
+	if err != nil {
+		logr.Info("SSH 连接出错", err)
+		return err
+	}
+	defer sftpClient.Close()
+	//用来测试的本地文件路径 和 远程机器上的文件夹
+	//var localFilePath = filePath
+	var remoteDir = rmtDir
+	var remoteFileName = fileName
+	logr.Info("--->", remoteFileName)
+	dstFile, err := sftpClient.Create(path.Join(remoteDir, remoteFileName))
+	if err != nil {
+		return error(err)
+	}
+	defer dstFile.Close()
+
+	rd, err := dstFile.ReadFrom(fileData)
+	if err != nil {
+		return error(err)
+	}
+	logr.Info("copy file to remote server finished:", rd)
 	return nil
 }
