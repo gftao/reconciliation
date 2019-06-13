@@ -140,7 +140,7 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? limit 300", cf.STLM_DATE).Rows()
+	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? limit 5000", cf.STLM_DATE).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
@@ -152,7 +152,6 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	for rows.Next() {
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
-		logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
 		if tc.KEY_RSP == "" {
 			continue
 		}
@@ -163,10 +162,10 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 		if b == nil {
 			continue
 		}
-		logr.Infof("%s", b.ToString()+"\n")
+		logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
+		logr.Infof("%s", b.ToString())
 		fp.WriteString(b.ToString() + "\n")
 	}
-	logr.Infof("]---")
 	l, _ := fp.Seek(-1, 2)
 	fp.Truncate(l)
 
