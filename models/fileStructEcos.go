@@ -13,8 +13,9 @@ var TranCdConvert = map[string]string{
 	"1131": "1001",
 	"2131": "3001",
 	"3131": "5141",
-	"1031": "    ",
-	"2031": "    ",
+
+	"1031": "1101", //预授权完成
+	"2031": "3101", //预授权撤销
 }
 
 var CARDConvert = map[string]string{

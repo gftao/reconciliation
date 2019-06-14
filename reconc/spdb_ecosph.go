@@ -222,6 +222,8 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 	logr.Infof("KEY_RSP=%s,sys_order_id=%s, cust_order_id=%s", tc.KEY_RSP, sysId, tran.CUST_ORDER_ID)
 	if strings.HasPrefix(tran.CUST_ORDER_ID, "spdb_ecosph") {
 		b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
+	} else {
+		b.CUST_ORDER_ID = "  "
 	}
 	b.Stl_flag = "0"
 	return &b, nil
