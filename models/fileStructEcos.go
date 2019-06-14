@@ -21,7 +21,7 @@ var TranCdConvert = map[string]string{
 var CARDConvert = map[string]string{
 	"0000007": "11",
 	"0000008": "12",
-	"0000000": "  ",
+	"0000000": "",
 }
 
 type FileStrtEchos struct {
@@ -49,11 +49,11 @@ func (f FileStrtEchos) ToString() string {
 			if vi == "0" {
 				vi = ""
 			}
- 			strs = append(strs, vi)
+			strs = append(strs, vi)
 		} else {
 			strs = append(strs, v.Field(i).String())
 		}
- 	}
+	}
 	s := strings.Join(strs, "||")
 	return s
 }

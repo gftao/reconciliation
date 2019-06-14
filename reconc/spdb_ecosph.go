@@ -124,23 +124,23 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 		return gerr
 	}
 	f.Sync()
-	f.Close()
-	fp, err := os.Open(fn)
-	if err != nil {
-		return gerror.NewR(1004, err, "打开文件失败:%s", fn)
-	}
-	defer fp.Close()
+	//f.Close()
+	//fp, err := os.Open(fn)
+	//if err != nil {
+	//	return gerror.NewR(1004, err, "打开文件失败:%s", fn)
+	//}
+	//defer fp.Close()
 
 	f.Seek(0, 0)
-	cf.postToSftp(cf.FileName, fp)
-
+	cf.postToSftp(cf.FileName, f)
+	f.Close()
 	return nil
 }
 
 func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? limit 5000", cf.STLM_DATE).Rows()
+	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ?", cf.STLM_DATE).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
@@ -223,7 +223,7 @@ func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEch
 	if strings.HasPrefix(tran.CUST_ORDER_ID, "spdb_ecosph") {
 		b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
 	} else {
-		b.CUST_ORDER_ID = "  "
+		b.CUST_ORDER_ID = ""
 	}
 	b.Stl_flag = "0"
 	return &b, nil
