@@ -21,7 +21,7 @@ var TranCdConvert = map[string]string{
 var CARDConvert = map[string]string{
 	"0000007": "11",
 	"0000008": "12",
-	"0000000": "",
+	"0000000": "  ",
 }
 
 type FileStrtEchos struct {

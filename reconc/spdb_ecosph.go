@@ -162,8 +162,8 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 		if b == nil {
 			continue
 		}
-		logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
-		logr.Infof("%s", b.ToString())
+		//logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
+		//logr.Infof("%s", b.ToString())
 		fp.WriteString(b.ToString() + "\n")
 	}
 	l, _ := fp.Seek(-1, 2)
