@@ -11,7 +11,6 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
-	"net"
 	"os"
 	"path"
 	"log"
@@ -22,7 +21,7 @@ import (
 	"io"
 )
 
-func connect(user, password, host string, port int) (*sftp.Client, error) {
+func connect(user, password, host string, port int) (*sftp.Client, *ssh.Client, error) {
 	var (
 		auth         []ssh.AuthMethod
 		addr         string
@@ -37,37 +36,37 @@ func connect(user, password, host string, port int) (*sftp.Client, error) {
 
 	addr = fmt.Sprintf("%s:%d", host, port)
 	clientConfig = &ssh.ClientConfig{
-		User:    user,
-		Auth:    auth,
-		Timeout: 30 * time.Second,
-		HostKeyCallback: func(hostname string, addr net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
+		User:            user,
+		Auth:            auth,
+		Timeout:         30 * time.Second,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	} // connet to ssh
 
 	if sshClient, err = ssh.Dial("tcp", addr, clientConfig); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// create sftp client
 	if sftpClient, err = sftp.NewClient(sshClient); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return sftpClient, nil
+	return sftpClient, sshClient, nil
 }
 
 func PosSftp(user, password, host, port, filePath, rmtDir string) error {
 	var (
 		err        error
 		sftpClient *sftp.Client
+		sshClient  *ssh.Client
 	)
 
 	// 这里换成实际的 SSH 连接的 用户名，密码，主机名或IP，SSH端口
 	p, _ := strconv.Atoi(port)
-	sftpClient, err = connect(user, password, host, p)
+	sftpClient, sshClient, err = connect(user, password, host, p)
 	if err != nil {
 		logr.Info("SSH 连接出错", err)
 	}
 	defer sftpClient.Close()
+	defer sshClient.Close()
 	//用来测试的本地文件路径 和 远程机器上的文件夹
 	var localFilePath = filePath
 	var remoteDir = rmtDir
@@ -102,16 +101,18 @@ func PosByteSftp(user, password, host, port, fileName, rmtDir string, fileData [
 	var (
 		err        error
 		sftpClient *sftp.Client
+		sshClient  *ssh.Client
 	)
 
 	// 这里换成实际的 SSH 连接的 用户名，密码，主机名或IP，SSH端口
 	p, _ := strconv.Atoi(port)
-	sftpClient, err = connect(user, password, host, p)
+	sftpClient, sshClient, err = connect(user, password, host, p)
 	if err != nil {
 		logr.Info("SSH 连接出错", err)
 		return err
 	}
 	defer sftpClient.Close()
+	defer sshClient.Close()
 	//用来测试的本地文件路径 和 远程机器上的文件夹
 	//var localFilePath = filePath
 	var remoteDir = rmtDir
@@ -143,16 +144,18 @@ func PosIOSftp(user, password, host, port, fileName, rmtDir string, fileData io.
 	var (
 		err        error
 		sftpClient *sftp.Client
+		sshClient *ssh.Client
 	)
 
 	// 这里换成实际的 SSH 连接的 用户名，密码，主机名或IP，SSH端口
 	p, _ := strconv.Atoi(port)
-	sftpClient, err = connect(user, password, host, p)
+	sftpClient, sshClient,err = connect(user, password, host, p)
 	if err != nil {
 		logr.Info("SSH 连接出错", err)
 		return err
 	}
 	defer sftpClient.Close()
+	defer sshClient.Close()
 	//用来测试的本地文件路径 和 远程机器上的文件夹
 	//var localFilePath = filePath
 	var remoteDir = rmtDir
