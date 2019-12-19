@@ -322,8 +322,8 @@ func (cf *CrtFile) saveDatatoFStru() gerror.IError {
 		}
 		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)
 		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
-		b.EXT_FLD = tran.Ext_fld7
-		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
+		b.EXT_FLD = strings.TrimSpace(tran.Ext_fld7)
+ 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 
 	//cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
