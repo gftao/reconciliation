@@ -18,8 +18,7 @@ type TaskList struct {
 }
 
 var g_taskList []TaskList = []TaskList{
-
-	//{"CRTFILE", &reconc.CrtFile{}},
+	//{"CRTFILE", &reconc.FuzhouFJFile{}},
 	{"YCRL", &reconc.GenFile{}},
 }
 
@@ -27,6 +26,7 @@ func main() {
 
 	flag.Parse()
 	args := os.Args //获取用户输入的所有参数
+	//args = []string{"1", "20200106"}
 	if args == nil || len(args) < 2 || len(args[1]) != 8 {
 		fmt.Println(`请带一个格式为[20161119]的查询日期参数！`)
 		return
@@ -37,10 +37,10 @@ func main() {
 	err := config.InitModuleByParams(global.CONFIGFILE)
 	if err != nil {
 		fmt.Println("读取配置文件失败", global.CONFIGFILE, err)
- 		return
+		return
 	}
 
- 	err = logr.InitModules()
+	err = logr.InitModules()
 	if err != nil {
 		logr.Info("初始化日志失败", err)
 		return
@@ -63,7 +63,7 @@ func main() {
 			logr.Info("初始化失败: ", task.Name, err)
 			return
 		}
- 	}
+	}
 
 	for _, task := range g_taskList {
 		ac := task.Action

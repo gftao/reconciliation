@@ -45,14 +45,20 @@ func (g *GenFile) Run() {
 			g.Action = &CrtFunc1{}
 		case "2": //【生态圈】POS对账文件说明
 			g.Action = &Ecosph{}
-		case "3"://中法供水
+		case "3": //中法供水
 			g.Action = &SinoFrench{}
+		case "4": //福州房管局
+			g.Action = &FuzhouFJFile{}
 		default:
 			g.Action = &CrtFile{}
 		}
 
-		g.Action.Init(g.STLM_DATE, cd)
-		g.Action.Run()
+		gerr := g.Action.Init(g.STLM_DATE, cd)
+		if gerr == nil {
+			g.Action.Run()
+		} else {
+			logr.Error(gerr)
+		}
 	}
 
 }
