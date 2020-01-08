@@ -109,13 +109,15 @@ func (cf *FuzhouFJFile) SaveToFile() gerror.IError {
 
 	b.WriteString(cf.FileStrt.FileBody) //文件体 标识
 	b.WriteString("\r\n")
-	for _, tc := range cf.FileStrt.FileBodys {
+	l := len(cf.FileStrt.FileBodys) - 1
+	for i, tc := range cf.FileStrt.FileBodys {
 		Str := tc.BToString()
 		b.WriteString(Str)
-		b.WriteString("\r\n")
+		if i < l {
+			b.WriteString("\r\n")
+		}
 	}
-	//logr.Infof("--读取的数据1---[%s]", b)
-	rb := b.Bytes()
+ 	rb := b.Bytes()
 	logr.Infof("--读取的数据2---[%s]", string(rb))
 
 	cf.postToSftp(cf.FileName, rb)
