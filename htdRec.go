@@ -26,7 +26,7 @@ func main() {
 
 	flag.Parse()
 	args := os.Args //获取用户输入的所有参数
-	//args = []string{"1", "20200106"}
+	args = []string{"1", "20200106"}
 	if args == nil || len(args) < 2 || len(args[1]) != 8 {
 		fmt.Println(`请带一个格式为[20161119]的查询日期参数！`)
 		return
