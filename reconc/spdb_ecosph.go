@@ -88,12 +88,12 @@ func (cf *Ecosph) InitMCHTCd(mc string) gerror.IError {
 	}
 	logr.Infof("商户对账配置表:%+v\n", tbrec)
 
-	//for _, c := range strings.Split(tbrec.EXT4, ",") {
-	//	cf.Ins_id_cd = append(cf.Ins_id_cd, c)
-	//
-	//}
-	//cf.MCHT_TP = tbrec.Mcht_ty
-	//logr.Infof("初始化商户号:[%+v][%s]", cf.Ins_id_cd, cf.MCHT_TP)
+	for _, c := range strings.Split(tbrec.EXT4, ",") {
+		cf.Ins_id_cd = append(cf.Ins_id_cd, c)
+
+	}
+	cf.MCHT_TP = tbrec.Mcht_ty
+	logr.Infof("初始化商户号:[%+v][%s]", cf.Ins_id_cd, cf.MCHT_TP)
 	return nil
 }
 
@@ -140,7 +140,7 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ?", cf.STLM_DATE).Rows()
+	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? and MCHT_CD in (?) ", cf.STLM_DATE, cf.Ins_id_cd).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
