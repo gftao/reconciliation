@@ -6,6 +6,9 @@ import (
 	"golib/modules/logr"
 	"golib/modules/gormdb"
 	"golib/modules/config"
+	"sync"
+	"strings"
+	"time"
 )
 
 type IMYRun interface {
@@ -19,12 +22,14 @@ type GenFile struct {
 	FileName   string            //对账文件名
 	MCHT_CDS   []string          //全部机构号
 	MCHT_RECTY map[string]string //1-集团商户
+	MCHT_TIMER map[string]string //定时器
 	Action     IMYRun
 }
 
 func (g *GenFile) Init(initParams run.InitParams, chainName string) gerror.IError {
 	g.STLM_DATE = chainName //清算日期
 	g.MCHT_RECTY = make(map[string]string)
+	g.MCHT_TIMER = make(map[string]string)
 	err := g.InitMCHTCd()
 	if err != nil {
 		return gerror.NewR(1001, err, "无记录")
@@ -34,12 +39,14 @@ func (g *GenFile) Init(initParams run.InitParams, chainName string) gerror.IErro
 }
 
 func (g *GenFile) Run() {
+	var wg sync.WaitGroup
+
 	for {
 		cd, ok := g.GetMCHTCd()
 		if !ok {
-			return
+			break
 		}
-		logr.Infof("根据商户号注册方法:%s", g.MCHT_RECTY[cd])
+		logr.Infof("根据商户号注册方法:%v", g.MCHT_RECTY[cd])
 		switch g.MCHT_RECTY[cd] {
 		case "1": //银川热力专用
 			g.Action = &CrtFunc1{}
@@ -53,14 +60,35 @@ func (g *GenFile) Run() {
 			g.Action = &CrtFile{}
 		}
 
-		gerr := g.Action.Init(g.STLM_DATE, cd)
-		if gerr == nil {
-			g.Action.Run()
+		if md, ok := g.MCHT_TIMER[cd]; ok {
+			logr.Infof("根据商户号等待时间:%v", g.MCHT_TIMER[cd])
+			wg.Add(1)
+			d, _ := time.ParseDuration(md)
+			go func(a IMYRun, duration time.Duration) {
+				defer wg.Done()
+				//fmt.Println("duration=", duration)
+				time.Sleep(duration)
+				gerr := a.Init(g.STLM_DATE, cd)
+				if gerr == nil {
+					a.Run()
+				} else {
+					logr.Error(gerr)
+				}
+
+			}(g.Action, d)
 		} else {
-			logr.Error(gerr)
+			gerr := g.Action.Init(g.STLM_DATE, cd)
+			if gerr == nil {
+				g.Action.Run()
+			} else {
+				logr.Error(gerr)
+			}
 		}
+
 	}
 
+	wg.Wait()
+	//os.Exit(0)
 }
 
 func (g *GenFile) Finish() {
@@ -74,6 +102,8 @@ func (g *GenFile) InitMCHTCd() error {
 		mt := config.StringDefault("MCHT_RECTY", "0")
 		logr.Infof("读配置文件:%s,%s", mc, mt)
 		g.MCHT_RECTY[mc] = mt
+		tm := config.StringDefault("MCHT_TIMER", "0")
+		g.MCHT_TIMER[mc] = tm
 		return nil
 	}
 
@@ -90,7 +120,16 @@ func (g *GenFile) InitMCHTCd() error {
 		rows.Scan(&mc, &mt)
 		if mc != "" {
 			g.MCHT_CDS = append(g.MCHT_CDS, mc)
-			g.MCHT_RECTY[mc] = mt
+			mts := strings.Split(mt, "|")
+			//fmt.Println(mts)
+			for i, _ := range mts {
+				switch i {
+				case 0:
+					g.MCHT_RECTY[mc] = mts[i]
+				case 1:
+					g.MCHT_TIMER[mc] = mts[i]
+				}
+			}
 		}
 	}
 

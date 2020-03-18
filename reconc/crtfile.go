@@ -77,7 +77,7 @@ func (cf *CrtFile) indb() {
 }
 
 func (cf *CrtFile) Run() {
-
+	logr.Info("开始处理商户：", cf.MCHT_CD)
 	gerr := cf.SaveToFile()
 	if gerr != nil {
 		logr.Errorf("%s", gerr)
@@ -323,7 +323,7 @@ func (cf *CrtFile) saveDatatoFStru() gerror.IError {
 		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)
 		b.CUST_ORDER_ID = tran.CUST_ORDER_ID
 		b.EXT_FLD = strings.TrimSpace(tran.Ext_fld7)
- 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
+		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 
 	//cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
