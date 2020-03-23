@@ -307,15 +307,15 @@ func (cf *FuzhouFJFile) saveDatatoFStru() gerror.IError {
 		for i, _ := range e7 {
 			switch i {
 			case 0:
-				b.GF_BIZ_CD = e7[i]
+				b.GF_BIZ_CD = strings.Split(e7[i], ":")[1]
 			case 1:
-				b.CUST_ORDER_ID = e7[i]
+				b.CUST_ORDER_ID = strings.Split(e7[i], ":")[1]
 			case 2:
-				b.EXT_FLD1 = e7[i]
+				b.EXT_FLD1 = strings.Split(e7[i], ":")[1]
 			case 3:
-				b.EXT_FLD2 = e7[i]
+				b.EXT_FLD2 = strings.Split(e7[i], ":")[1]
 			case 4:
-				b.EXT_FLD3 = e7[i]
+				b.EXT_FLD3 = strings.Split(e7[i], ":")[1]
 			}
 		}
 
