@@ -117,7 +117,7 @@ func (cf *FuzhouFJFile) SaveToFile() gerror.IError {
 			b.WriteString("\r\n")
 		}
 	}
- 	rb := b.Bytes()
+	rb := b.Bytes()
 	logr.Infof("--读取的数据2---[%s]", string(rb))
 
 	cf.postToSftp(cf.FileName, rb)
@@ -183,7 +183,14 @@ func (cf *FuzhouFJFile) postToSftp(fileName string, fileData []byte) {
 			switch trans_ty {
 			case "0":
 				logr.Infof("SFTP:")
-				myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+				err = myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
+				if err != nil {
+					logr.Error(err)
+				}
+				err = myfstp.PosByteSftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				if err != nil {
+					logr.Error(err)
+				}
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
@@ -303,19 +310,21 @@ func (cf *FuzhouFJFile) saveDatatoFStru() gerror.IError {
 			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
 		}
 		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.Ext_fld7)
-		e7 := strings.Split(tran.Ext_fld7, ",")
-		for i, _ := range e7 {
-			switch i {
-			case 0:
-				b.GF_BIZ_CD = strings.Split(e7[i], ":")[1]
-			case 1:
-				b.CUST_ORDER_ID = strings.Split(e7[i], ":")[1]
-			case 2:
-				b.EXT_FLD1 = strings.Split(e7[i], ":")[1]
-			case 3:
-				b.EXT_FLD2 = strings.Split(e7[i], ":")[1]
-			case 4:
-				b.EXT_FLD3 = strings.Split(e7[i], ":")[1]
+		if tran.Ext_fld7 != "" {
+			e7 := strings.Split(tran.Ext_fld7, ",")
+			for i, _ := range e7 {
+				switch i {
+				case 0:
+					b.GF_BIZ_CD = strings.Split(e7[i], ":")[1]
+				case 1:
+					b.CUST_ORDER_ID = strings.Split(e7[i], ":")[1]
+				case 2:
+					b.EXT_FLD1 = strings.Split(e7[i], ":")[1]
+				case 3:
+					b.EXT_FLD2 = strings.Split(e7[i], ":")[1]
+				case 4:
+					b.EXT_FLD3 = strings.Split(e7[i], ":")[1]
+				}
 			}
 		}
 
@@ -352,7 +361,7 @@ func (cf *FuzhouFJFile) geneFile() string {
 	}
 
 	//cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + "摘要" + ".txt"
-	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_"  + ".txt"
+	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + ".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
