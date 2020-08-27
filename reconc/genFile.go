@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+var (
+	FZFGMCT int
+)
+
 type IMYRun interface {
 	Init(string, string) gerror.IError
 	Run()
@@ -104,6 +108,9 @@ func (g *GenFile) InitMCHTCd() error {
 		g.MCHT_RECTY[mc] = mt
 		tm := config.StringDefault("MCHT_TIMER", "0")
 		g.MCHT_TIMER[mc] = tm
+		if mt == "4" {
+			FZFGMCT += 1
+		}
 		return nil
 	}
 
@@ -126,14 +133,18 @@ func (g *GenFile) InitMCHTCd() error {
 				switch i {
 				case 0:
 					g.MCHT_RECTY[mc] = mts[i]
+					if mts[i] == "4" {
+						FZFGMCT += 1
+					}
+
 				case 1:
 					g.MCHT_TIMER[mc] = mts[i]
 				}
 			}
 		}
 	}
-
 	logr.Infof("初始化商户号:+v", g.MCHT_RECTY)
+	logr.Infof("福州房管商户总数:%d", FZFGMCT)
 	return nil
 }
 

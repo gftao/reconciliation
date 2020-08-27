@@ -19,13 +19,15 @@ func Myftp(user, password, host, port, fileName, rmtDir string, fileDta []byte) 
 		addr = fmt.Sprintf("%s:%s", host, "21")
 	}
 	logr.Info("remote addr: ", addr)
-	s, err := ftp.DialTimeout(addr, 20*time.Second)
+
+	s, err := ftp.Dial(addr, ftp.DialWithTimeout(50*time.Second))
 	if err != nil {
-		return err
+ 		return err
 	}
 	defer s.Quit()
 	err = s.Login(user, password)
 	if err != nil {
+		fmt.Println("login")
 		return err
 	}
 	defer s.Logout()
@@ -108,5 +110,53 @@ func MyftpTSL(user, password, host, port, fileName, rmtDir string, fileDta []byt
 	}
 	logr.Info("ftp post success")
 
+	return nil
+}
+
+
+func Myftp2(user, password, host, port, fileName, rmtDir string, fileDta []byte) error {
+	var err error
+	var ftp *goftp.FTP
+	addr := ""
+	if port != "" {
+		addr = fmt.Sprintf("%s:%s", host, port)
+	} else {
+		addr = fmt.Sprintf("%s:%s", host, "21")
+	}
+	logr.Info("remote addr: ", addr)
+	// For debug messages: goftp.ConnectDbg("ftp.server.com:21")
+	if ftp, err = goftp.Connect(addr); err != nil {
+		logr.Error(err)
+		return err
+	}
+
+	defer ftp.Close()
+	//fmt.Println("Successfully connected to", addr)
+
+	// TLS client authentication
+	//config := &tls.Config{
+	//	InsecureSkipVerify: true,
+	//	ClientAuth:         tls.RequestClientCert,
+	//}
+ 	//if err = ftp.AuthTLS(config); err != nil {
+	//	panic(err)
+	//}
+ 	// Username / password authentication
+  	if err = ftp.Login(user, password); err != nil {
+		logr.Error(err)
+		return err
+	}
+
+	if err = ftp.Cwd(rmtDir); err != nil {
+		logr.Error(err)
+		return err
+	}
+	b := bytes.NewBuffer(fileDta)
+
+	if err := ftp.Stor(fileName, b); err != nil {
+		logr.Error(err)
+		return err
+	}
+	logr.Info("ftp post success")
 	return nil
 }

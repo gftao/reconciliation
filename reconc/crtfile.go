@@ -188,7 +188,7 @@ func (cf *CrtFile) postToSftp(fileName string, fileData []byte) {
 				}
 			case "2":
 				logr.Infof("FTP without TLS:")
-				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, fileData)
+				err = myftp.Myftp2(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
 				}

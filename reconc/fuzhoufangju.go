@@ -182,15 +182,18 @@ func (cf *FuzhouFJFile) postToSftp(fileName string, fileData []byte) {
 
 			switch trans_ty {
 			case "0":
-				logr.Infof("SFTP:")
+				logr.Infof("SFTP:%d", FZFGMCT)
 				err = myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
 				}
-				err = myfstp.PosByteSftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
-				if err != nil {
-					logr.Error(err)
+				if FZFGMCT--; FZFGMCT == 0 {
+					err = myfstp.PosByteSftp(user, password, host, port, "YSFPOS_"+cf.Pay_DATE_E+".finish", rmtDir, []byte{})
+					if err != nil {
+						logr.Error(err)
+					}
 				}
+
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
