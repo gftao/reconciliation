@@ -104,13 +104,14 @@ func (cf *HZFile) SaveToFile() gerror.IError {
 	b := bytes.NewBuffer(buf)
 	b.WriteString(UTF8tGBK(cf.FileStrt.FileHead) + "\r\n")
 
+	var Str string
 	for _, tc := range cf.FileStrt.HZFileInfo {
-		Str := tc.HToString()
+		Str = tc.HToString()
 		b.WriteString(UTF8tGBK(Str))
 		b.WriteString("\r\n")
 	}
 	rb := b.Bytes()
-	logr.Infof("--读取的数据---[%s]", string(rb))
+	logr.Infof("--读取的数据---[%s]", Str)
 
 	cf.postToSftp(cf.FileName, rb)
 
@@ -290,7 +291,7 @@ func (cf *HZFile) saveDatatoFStru() gerror.IError {
 			}
 		}
 		//fmt.Println(SYS_ID)
-		err = dbt.Where("sys_order_id = ? and tran_cd ='1131'", SYS_ID).Find(&tran).Error
+		err = dbt.Where("sys_order_id = ?", SYS_ID).Find(&tran).Error
 		if err != nil {
 			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
 			continue
@@ -351,7 +352,6 @@ func (cf *HZFile) geneFile() string {
 }
 
 func (cf *HZFile) InitMCHTCd(mc string) gerror.IError {
-
 	//商户号
 	dbc := gormdb.GetInstance()
 	//rows, err := dbc.Raw("SELECT distinct MCHT_CD FROM tbl_mcht_recon_list").Rows()
