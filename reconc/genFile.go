@@ -56,6 +56,8 @@ func (g *GenFile) Run() {
 			g.Action = &SinoFrench{}
 		case "4": //福州房管局
 			g.Action = &FuzhouFJFile{}
+		case "6"://湖州住建局
+			g.Action = &HZFile{}
 		default:
 			g.Action = &CrtFile{}
 		}
