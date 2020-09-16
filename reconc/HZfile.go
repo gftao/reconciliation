@@ -3,6 +3,7 @@ package reconc
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/axgle/mahonia"
 	"github.com/jinzhu/gorm"
 	"golib/gerror"
@@ -10,6 +11,7 @@ import (
 	"golib/modules/gormdb"
 	"htdRec/models"
 	"htdRec/myfstp"
+	"strconv"
 	"strings"
 
 	"database/sql"
@@ -312,7 +314,8 @@ func (cf *HZFile) saveDatatoFStru() gerror.IError {
 		}else{
 			b.Currency = "其他"
 		}
-		b.TranAmt = tran.TRAN_AMT
+		amt,_ := strconv.ParseFloat(tran.TRAN_AMT,64)
+		b.TranAmt = fmt.Sprintf("%.2f",amt/100)
 		b.TranAccountName = " "
 		b.TranBankName = bank.INS_ID_NM
 		b.EXT_FLD1 = tran.PRI_ACCT_NO
