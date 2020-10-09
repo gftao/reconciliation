@@ -29,7 +29,7 @@ type KunshanZJFile struct {
 	Pay_DATE_S           string                     //划付日期
 	Pay_DATE_E           string                     //划付日期
 	Ins_id_cd            []string                   //全部机构号
-	FileStrt             models.FuzhouStrt          //文件结构
+	FileStrt             models.KSFileStrt          //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
@@ -47,7 +47,7 @@ func (cf *KunshanZJFile) Init(chainName string, mc string) gerror.IError {
 	logr.Info("是否发送ftp：", cf.sendto)
 
 	cf.SysDate = time.Now().Format("20060102") //今天
-	cf.FileStrt = models.FuzhouStrt{}
+	cf.FileStrt = models.KSFileStrt{}
 	cf.STLM_DATE = chainName //清算日期
 	cf.MCHT_TP = make(map[string]string, 1)
 	cf.FileStrt.Init()
@@ -187,7 +187,8 @@ func (cf *KunshanZJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				err = myfstp.PosByteSftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				name := "YSFPOS_"+cf.Pay_DATE_E + ".txt"
+				err = myfstp.PosByteSftp(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
 				}
@@ -251,7 +252,7 @@ func (cf *KunshanZJFile) ReadDate() gerror.IError {
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
 	}
 	if len(cf.Tbl_Clear_Data) > 0 || cf.empty {
-		cf.FileStrt.FileHeadInfo.Area_CD = cf.Area_cd				//服务商地区代码
+		cf.FileStrt.KSFileHeadInfo.Area_CD = cf.Area_cd				//服务商地区代码
 	} else {
 		return gerror.NewR(0000, err, "MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
@@ -265,7 +266,7 @@ func (cf *KunshanZJFile) ReadDate() gerror.IError {
 
 func (cf *KunshanZJFile) saveDatatoFStru() gerror.IError {
 	//cf.FileStrt.FileBodys = make([]models.Body,0)
-	cf.FileStrt.FileBodys = []models.FuzhouBody{}
+	cf.FileStrt.FileBodys = []models.KSBody{}
 	dbc := gormdb.GetInstance()
 	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
@@ -278,7 +279,7 @@ func (cf *KunshanZJFile) saveDatatoFStru() gerror.IError {
 	record := 0        //交易总笔数
 	trnrecont_T := 0.0 //结算总金额
 	for _, tc := range cf.Tbl_Clear_Data {
-		b := models.FuzhouBody{}
+		b := models.KSBody{}
 		tfr := models.Tbl_tfr_his_trn_log{}
 		tran := models.Tran_logs{}
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
@@ -318,7 +319,7 @@ func (cf *KunshanZJFile) saveDatatoFStru() gerror.IError {
 		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)
 
 		b.GF_BIZ_CD = tran.CUST_ORDER_ID								//购房业务编码
-		b.CUST_ORDER_ID = " "														//购房业务编码
+		b.CUST_ORDER_ID = " "														//第三方订单号
 		b.EXT_FLD1 = " "																//备注1
 		b.EXT_FLD2 = " "																//备注2
 		b.EXT_FLD3 = " "																//备注3
@@ -326,11 +327,11 @@ func (cf *KunshanZJFile) saveDatatoFStru() gerror.IError {
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 
-	cf.FileStrt.FileHeadInfo.Stlm_date = cf.Pay_DATE_E
-	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)		//交易总结算额
+	cf.FileStrt.KSFileHeadInfo.Stlm_date = cf.Pay_DATE_E
+	cf.FileStrt.KSFileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)		//交易总结算额
 	logr.Info("成功总笔数:", record)
 
-	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)			//成功总笔数
+	cf.FileStrt.KSFileHeadInfo.TrnSucCount = strconv.Itoa(record)			//成功总笔数
 	return nil
 }
 
