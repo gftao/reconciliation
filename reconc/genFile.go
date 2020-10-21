@@ -60,6 +60,12 @@ func (g *GenFile) Run() {
 			g.Action = &KunshanZJFile{}
 		case "6"://湖州住建局
 			g.Action = &HZFile{}
+		case "7"://柳州住建局
+			g.Action = &LiuzhouZJFile{}
+		case "8"://南通住建局
+			g.Action = &NantongZJFile{}
+		case "9"://昆明住建局
+			g.Action = &KunmingZJFile{}
 		default:
 			g.Action = &CrtFile{}
 		}
