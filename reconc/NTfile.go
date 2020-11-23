@@ -307,10 +307,8 @@ func (cf *NantongZJFile) saveDatatoFStru() gerror.IError {
 		}
 		TRAND_CD := tfr.MA_TRANS_CD
 		switch TRAND_CD[:1] {
-		case "1":
+		case "1", "2", "3":
 			b.MCHT_SET_AMT = tc.MCHT_SET_AMT					//交易结算资金
-		case "2", "3":
-			continue
 		}
 		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
 		if err != nil {
