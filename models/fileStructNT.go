@@ -22,7 +22,7 @@ type NTFileHeadInfo struct {
 
 type NTBody struct {
 	MCHT_CD       string //商户号
-	GF_BIZ_CD     string //购房业务编号
+	GF_BIZ_CD     string //分户ID
 	TRANS_KIND    string //交易类型
 	TRANS_DATE    string //业务发生时间  交易日期 Tbl_tfr_his_trn_log->TRANS_DT
 	STLM_DATE     string //清算日期

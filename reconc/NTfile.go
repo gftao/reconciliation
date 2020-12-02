@@ -307,16 +307,26 @@ func (cf *NantongZJFile) saveDatatoFStru() gerror.IError {
 		}
 		TRAND_CD := tfr.MA_TRANS_CD
 		switch TRAND_CD[:1] {
-		case "1", "2", "3":
-			b.MCHT_SET_AMT = tc.MCHT_SET_AMT					//交易结算资金
+		case "1":
+			err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
+			if err != nil {
+				logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
+			}
+			logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)
+		case "2", "3":
+			err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
+			if err != nil {
+				logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
+			}
+			b.SYS_ID = tran.ORIG_SYS_ORDER_ID								//系统流水号
+			err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
+			if err != nil {
+				logr.Info("db tran_logs find orig_sys_order_id failed:%s\n", err)
+			}
 		}
-		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
-		if err != nil {
-			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
-		}
-		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)
 
-		b.GF_BIZ_CD = tran.CUST_ORDER_ID								//购房业务编码
+		b.MCHT_SET_AMT = tc.MCHT_SET_AMT					//交易结算资金
+		b.GF_BIZ_CD = tran.CUST_ORDER_ID								//分户ID
 		b.CUST_ORDER_ID = " "														//第三方订单号
 		b.EXT_FLD1 = " "																//备注1
 		b.EXT_FLD2 = " "																//备注2
