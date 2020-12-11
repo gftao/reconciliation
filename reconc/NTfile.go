@@ -328,7 +328,7 @@ func (cf *NantongZJFile) saveDatatoFStru() gerror.IError {
 		b.MCHT_SET_AMT = tc.MCHT_SET_AMT					//交易结算资金
 		b.GF_BIZ_CD = tran.CUST_ORDER_ID								//分户ID
 		b.CUST_ORDER_ID = " "														//第三方订单号
-		b.EXT_FLD1 = " "																//备注1
+		b.EXT_FLD1 = tran.PRI_ACCT_NO										//备注1
 		b.EXT_FLD2 = " "																//备注2
 		b.EXT_FLD3 = " "																//备注3
 
