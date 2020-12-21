@@ -1,6 +1,7 @@
 package reconc
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/axgle/mahonia"
 	"github.com/jinzhu/gorm"
@@ -10,10 +11,13 @@ import (
 	"golib/modules/logr"
 	"htdRec/models"
 	"htdRec/myfstp"
+	"htdRec/myftp"
 	"io"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type HZFile struct {
@@ -28,9 +32,12 @@ type HZFile struct {
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
 	dbstr                string
-	MCHT_TP              string // map[string]string
+	MCHT_TP              map[string]string
 	sendto               bool
 	dbt                  *gorm.DB
+	Pay_DATE             bool //是否为划付日
+	Pay_DATE_S           string                     //划付日期
+	Pay_DATE_E           string                     //划付日期
 }
 
 func (cf *HZFile) Init(chainName string, mc string) gerror.IError {
@@ -92,11 +99,50 @@ func (cf *HZFile) InitMCHTCd(mc string) gerror.IError {
 	}
 	logr.Infof("商户对账配置表:%+v\n", tbrec)
 
+	if mc != "" {
+		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
+		cf.MCHT_TP[mc] = tbrec.Mcht_ty
+	}
+
 	for _, c := range strings.Split(tbrec.EXT4, ",") {
 		cf.Ins_id_cd = append(cf.Ins_id_cd, c)
-
 	}
-	cf.MCHT_TP = tbrec.Mcht_ty
+
+	th := models.TBL_HOLI_INF{}
+	od, _ := time.ParseDuration("24h")
+	std, err := time.ParseInLocation("20060102", cf.STLM_DATE, time.Local)
+	if err != nil {
+		return gerror.NewR(1001, err, "\033[0;31m"+"假期解析失败"+"\033[0m \n")
+	}
+	py := std.Add(od).Format("20060102")
+
+	err = dbc.Where("START_DATE <= ? and ? <= END_DATE", py, py).Find(&th).Error
+	if err == gorm.ErrRecordNotFound {
+		cf.Pay_DATE_S = py
+		cf.Pay_DATE_E = py
+		logr.Infof("商户[%s]划付日期为:%s", mc, cf.Pay_DATE_E)
+	} else if err != nil {
+		logr.Infof("商户[%s]划付日期查询失败:%s", mc, err)
+		return gerror.NewR(1000, err, "商户[%s]划付日期查询失败:%s", mc, err)
+	} else {
+		//判断是否为划付日
+		if py == th.END_DATE {
+			cf.Pay_DATE = true
+		} else {
+			return gerror.NewR(1001, err, "商户[%s]未到划付日期:%s", mc, th.END_DATE)
+		}
+		td, err := time.ParseInLocation("20060102", th.START_DATE, time.Local)
+		if err != nil {
+			return gerror.NewR(1001, err, "\033[0;31m"+"假期解析失败"+"\033[0m \n")
+		}
+
+		dd, _ := time.ParseDuration("-24h")
+		cf.Pay_DATE_S = td.Add(dd).Format("20060102")
+		cf.Pay_DATE_E = py
+		logr.Infof("商户[%s]假期[%s-%s][%s]合并,划付日期为:%v", mc, cf.Pay_DATE_S, cf.STLM_DATE, th.HOLIDAY_DSP, cf.Pay_DATE_E)
+	}
+
+	//cf.MCHT_TP = tbrec.Mcht_ty
 	logr.Infof("初始化商户号:[%+v][%s]", cf.Ins_id_cd, cf.MCHT_TP)
 	return nil
 }
@@ -143,8 +189,28 @@ func (cf *HZFile) SaveToFile() gerror.IError {
 
 func (cf *HZFile) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
+	var rows *sql.Rows
+	var err error
+	logr.Info(cf.MCHT_CD, "->", cf.MCHT_TP[cf.MCHT_CD])
+	//rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? and MCHT_CD in (?) ", cf.STLM_DATE, cf.Ins_id_cd).Rows()
+	if cf.Pay_DATE {
+		if cf.MCHT_TP[cf.MCHT_CD] == "0" {
+			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and (STLM_DATE between ? and ? )", cf.MCHT_CD, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
+		} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
+			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and (STLM_DATE between ? and ? )", cf.MCHT_CD, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
+		} else {
+			return nil
+		}
+	} else {
+		if cf.MCHT_TP[cf.MCHT_CD] == "0" {
+			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
+		} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
+			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
+		} else {
+			return nil
+		}
+	}
 
-	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? and MCHT_CD in (?) ", cf.STLM_DATE, cf.Ins_id_cd).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
 		return gerror.NewR(1000, err, "查对账数据失败:%s", err)
@@ -228,30 +294,30 @@ func (cf *HZFile) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.HZFileHeadI
 	//fmt.Println(tran.ISS_INS_ID_CD)
 	err = dbc.Where("INS_ID_CD = ?", tran.ISS_INS_ID_CD).First(&bank).Error
 	if err != nil {
-		logr.Infof("dbc find failed, INS_ID_CD = %s, err = %s", bank.INS_ID_NM, err)
+		logr.Infof("dbc find failed, INS_ID_CD = %s, err = %s", tran.ISS_INS_ID_CD, err)
 	}
-	b.KEY_RSP = tc.KEY_RSP
-	b.MasterAcccount = mcht.ACCOUNT
-	b.SubAccount = tran.Ext_fld7
-	b.TranDate = string([]byte(tran.TRAN_DT_TM)[:8])
-	b.TranTime = string([]byte(tran.TRAN_DT_TM)[8:])
+	b.KEY_RSP = tc.KEY_RSP														//交易流水号
+	b.MasterAcccount = mcht.ACCOUNT									//主账户户号
+	b.SubAccount = tran.Ext_fld7												//子账户户号
+	b.TranDate = string([]byte(tran.TRAN_DT_TM)[:8])				//交易发生日期
+	b.TranTime = string([]byte(tran.TRAN_DT_TM)[8:])				//交易发生时间
 	if tran.CURR_CD =="156"{
-		b.Currency = "RMB"
+		b.Currency = "RMB"															//币种
 	}else{
 		b.Currency = "其他"
 	}
 	amt,_ := strconv.ParseFloat(tran.TRAN_AMT,64)
-	b.TranAmt = fmt.Sprintf("%.2f",amt/100)
+	b.TranAmt = fmt.Sprintf("%.2f",amt/100)								//交易金额
 	//b.TranAmt=tc.MCHT_SET_AMT
-	b.TranAccountName = " "
-	b.TranBankName = bank.INS_ID_NM
-	b.EXT_FLD1 = tran.PRI_ACCT_NO
-	b.EXT_FLD2 = " "
+	b.TranAccountName = " "														//对方账户户名
+	b.TranBankName = bank.INS_ID_NM									//对方银行名称
+	b.EXT_FLD1 = tran.PRI_ACCT_NO											//交易备注1--交易账户
+	b.EXT_FLD2 = " "																	//交易备注2
 	return &b, nil
 }
 
 func (cf *HZFile) geneFile() string {
-	cf.FileName = cf.FileName + cf.STLM_DATE+".txt"
+	cf.FileName = cf.FileName + cf.Pay_DATE_E+".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
@@ -273,7 +339,7 @@ func (cf *HZFile) GetInsIdCd() (string, bool) {
 func (cf *HZFile) postToSftp(fileName string, fileData io.Reader) {
 
 	dbc := gormdb.GetInstance()
-
+	data, err := ioutil.ReadAll(fileData)
 	rows, err := dbc.Raw("SELECT * FROM tbl_mcht_recon_list WHERE MCHT_CD = ?", cf.MCHT_CD).Rows()
 	if err != nil {
 		logr.Info("dbc find failed:", err)
@@ -310,7 +376,18 @@ func (cf *HZFile) postToSftp(fileName string, fileData io.Reader) {
 				if err != nil {
 					logr.Error(err)
 				}
-
+			case "1":
+				logr.Infof("FTP with TLS:")
+				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, data)
+				if err != nil {
+					logr.Error(err)
+				}
+			case "2":
+				logr.Infof("FTP without TLS:")
+				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, data)
+				if err != nil {
+					logr.Error(err)
+				}
 			default:
 				logr.Infof("default FTP is not support")
 			}

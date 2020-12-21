@@ -12,7 +12,6 @@ type HZFileStrt  struct {
 }
 
 type HZFileHeadInfo struct {
-
 	KEY_RSP   string //交易流水号
 	MasterAcccount   string //主账户户号
 	SubAccount string //子账户户号
