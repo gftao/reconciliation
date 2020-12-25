@@ -297,7 +297,7 @@ func (cf *LiuzhouZJFile) saveDatatoFStru() gerror.IError {
 			logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
 			continue
 		}
-		record ++
+
 		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
 		trnrecont_T += m
 		b.MCHT_CD = tc.MCHT_CD										//商户号
@@ -333,7 +333,7 @@ func (cf *LiuzhouZJFile) saveDatatoFStru() gerror.IError {
 		b.EXT_FLD1 = " "																//备注1
 		b.EXT_FLD2 = " "																//备注2
 		b.EXT_FLD3 = " "																//备注3
-
+		record ++
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 

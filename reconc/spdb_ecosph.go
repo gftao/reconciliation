@@ -7,9 +7,11 @@ import (
 	"golib/modules/config"
 	"github.com/jinzhu/gorm"
 	"golib/modules/gormdb"
+	"io/ioutil"
 	"os"
 	"strings"
 	"htdRec/myfstp"
+	"htdRec/myftp"
 	"io"
 )
 
@@ -252,7 +254,7 @@ func (cf *Ecosph) GetInsIdCd() (string, bool) {
 func (cf *Ecosph) postToSftp(fileName string, fileData io.Reader) {
 
 	dbc := gormdb.GetInstance()
-
+	data, err := ioutil.ReadAll(fileData)
 	rows, err := dbc.Raw("SELECT * FROM tbl_mcht_recon_list WHERE MCHT_CD = ?", cf.MCHT_CD).Rows()
 	if err != nil {
 		logr.Info("dbc find failed:", err)
@@ -286,6 +288,26 @@ func (cf *Ecosph) postToSftp(fileName string, fileData io.Reader) {
 					logr.Error(err)
 				}
 				err = myfstp.PosByteSftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				if err != nil {
+					logr.Error(err)
+				}
+			case "1":
+				logr.Infof("FTP with TLS:")
+				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, data)
+				if err != nil {
+					logr.Error(err)
+				}
+				err = myftp.MyftpTSL(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				if err != nil {
+					logr.Error(err)
+				}
+			case "2":
+				logr.Infof("FTP without TLS:")
+				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, data)
+				if err != nil {
+					logr.Error(err)
+				}
+				err = myftp.Myftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
 				}
