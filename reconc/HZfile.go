@@ -279,7 +279,7 @@ func (cf *HZFile) saveDatatoFStru() gerror.IError {
 			if tfr.RETRI_REF_NO[:1] == cf.STLM_DATE[3:4] {
 				SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			} else {
-				SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
+				SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			}
 		}
 		//fmt.Println(SYS_ID)

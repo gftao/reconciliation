@@ -311,7 +311,7 @@ func (cf *QuzhouZJFile) saveDatatoFStru() gerror.IError {
 			if tfr.RETRI_REF_NO[:1] == cf.STLM_DATE[3:4] {
 				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			} else {
-				b.SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO		//系统流水号
+				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO		//系统流水号
 			}
 		}
 		TRAND_CD := tfr.MA_TRANS_CD
