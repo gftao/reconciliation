@@ -2,12 +2,12 @@ package reconc
 
 import (
 	"golib/gerror"
-	"golib/modules/run"
-	"golib/modules/logr"
-	"golib/modules/gormdb"
 	"golib/modules/config"
-	"sync"
+	"golib/modules/gormdb"
+	"golib/modules/logr"
+	"golib/modules/run"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -48,6 +48,8 @@ func (g *GenFile) Run() {
 		}
 		logr.Infof("根据商户号注册方法:%v", g.MCHT_RECTY[cd])
 		switch g.MCHT_RECTY[cd] {
+		case "0":
+			g.Action = &CrtFile2{} //default划付日期版
 		case "1": //银川热力专用
 			g.Action = &CrtFunc1{}
 		case "2": //【生态圈】POS对账文件说明
@@ -56,18 +58,28 @@ func (g *GenFile) Run() {
 			g.Action = &SinoFrench{}
 		case "4": //福州房管局
 			g.Action = &FuzhouFJFile{}
-		case "5"://昆山住建局
+		case "5": //昆山住建局
 			g.Action = &KunshanZJFile{}
-		case "6"://湖州住建局
+		case "6": //湖州住建局
 			g.Action = &HZFile{}
-		case "7"://柳州住建局
+		case "7": //柳州住建局
 			g.Action = &LiuzhouZJFile{}
-		case "8"://南通住建局
+		case "8": //南通住建局
 			g.Action = &NantongZJFile{}
-		case "9"://昆明住建局
+		case "9": //昆明住建局
 			g.Action = &KunmingZJFile{}
-		case "10"://衢州住建局
+		case "10": //衢州住建局
 			g.Action = &QuzhouZJFile{}
+			/*		case "11": //成都住建局
+						g.Action = &ChengduZJFile{}
+					case "12": //石家庄住建局
+						g.Action = &ShijiazhuangZJFile{}*/
+		case "13": //贵阳住建局
+			g.Action = &GYFile{}
+			/*		case "14": //上海科技馆
+					g.Action = &SHKJGFile{}*/
+		case "15": //济南住建局
+			g.Action = &JinanZJFile{}
 		default:
 			g.Action = &CrtFile{}
 		}
@@ -156,7 +168,7 @@ func (g *GenFile) GetMCHTCd() (string, bool) {
 	}
 
 	g.MCHT_CD = g.MCHT_CDS[0]
-	g.MCHT_CDS = g.MCHT_CDS [1:]
+	g.MCHT_CDS = g.MCHT_CDS[1:]
 	logr.Infof("取机构号:%s; 剩余机构号:%v", g.MCHT_CD, g.MCHT_CDS)
 
 	return g.MCHT_CD, true

@@ -1,7 +1,6 @@
 package reconc
 
 import (
-	"github.com/axgle/mahonia"
 	"github.com/jinzhu/gorm"
 	"golib/gerror"
 	"golib/modules/config"
@@ -16,14 +15,14 @@ import (
 	"strings"
 )
 
-type HZFile struct {
+type GYFile struct {
 	FileName             string                     //对账文件名
 	FilePath             string                     //路径
 	SysDate              string                     //当前时间
 	MCHT_CD              string                     //当前机构号
 	STLM_DATE            string                     //清算日期
 	Ins_id_cd            []string                   //全部机构号
-	FileStrt             models.HZFileStrt     //文件结构
+	FileStrt             models.GYFileStrt     //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
@@ -33,8 +32,8 @@ type HZFile struct {
 	dbt                  *gorm.DB
 }
 
-func (cf *HZFile) Init(chainName string, mc string) gerror.IError {
-	cf.FileName = "HUZSPFYSPOS_"
+func (cf *GYFile) Init(chainName string, mc string) gerror.IError {
+	cf.FileName = "gazjj_ysk_pfyh_"
 	cf.FilePath = config.StringDefault("filePath", "")
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
@@ -50,7 +49,7 @@ func (cf *HZFile) Init(chainName string, mc string) gerror.IError {
 	return nil
 }
 
-func (cf *HZFile) indb() {
+func (cf *GYFile) indb() {
 	config.SetSection("db1")
 	dbtype := config.StringDefault("db.type", "mysql")
 	dbhost := config.StringDefault("db.host", "127.0.0.1")
@@ -76,7 +75,7 @@ func (cf *HZFile) indb() {
 	cf.dbt.DB().Ping()
 }
 
-func (cf *HZFile) InitMCHTCd(mc string) gerror.IError {
+func (cf *GYFile) InitMCHTCd(mc string) gerror.IError {
 
 	//商户号
 	dbc := gormdb.GetInstance()
@@ -101,7 +100,7 @@ func (cf *HZFile) InitMCHTCd(mc string) gerror.IError {
 	return nil
 }
 
-func (cf *HZFile) Run() {
+func (cf *GYFile) Run() {
 	defer cf.dbt.Close()
 
 	gerr := cf.SaveToFile()
@@ -111,7 +110,7 @@ func (cf *HZFile) Run() {
 	return
 }
 
-func (cf *HZFile) SaveToFile() gerror.IError {
+func (cf *GYFile) SaveToFile() gerror.IError {
 
 	//创建文件
 	fn := cf.geneFile()
@@ -141,7 +140,7 @@ func (cf *HZFile) SaveToFile() gerror.IError {
 	return nil
 }
 
-func (cf *HZFile) ReadDate(fp *os.File) gerror.IError {
+func (cf *GYFile) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
 	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? and MCHT_CD in (?) ", cf.STLM_DATE, cf.Ins_id_cd).Rows()
@@ -153,8 +152,8 @@ func (cf *HZFile) ReadDate(fp *os.File) gerror.IError {
 		return gerror.NewR(1000, err, "查对账数据失败:%s", err)
 	}
 	//.Println(cf.FileStrt.FileHead)
-	fp.WriteString(UTF8tGBK(cf.FileStrt.FileHead) + "\r\n")
-	logr.Infof("--读取湖州住建数据---")
+	fp.WriteString(cf.FileStrt.FileHead + "\r\n")
+	logr.Infof("--读取贵阳住建数据---")
 	for rows.Next() {
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
@@ -171,7 +170,7 @@ func (cf *HZFile) ReadDate(fp *os.File) gerror.IError {
 		//logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
 		//logr.Infof("%s", b.ToString())
 		logr.Infof("[%s]",b.HToString())
-		fp.WriteString(UTF8tGBK(b.HToString()) + "\n")
+		fp.WriteString(b.HToString() + "|\n")
 	}
 	l, _ := fp.Seek(-1, 2)
 	fp.Truncate(l)
@@ -179,8 +178,8 @@ func (cf *HZFile) ReadDate(fp *os.File) gerror.IError {
 	return nil
 }
 
-func (cf *HZFile) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.HZFileHeadInfo, gerror.IError) {
-	cf.FileStrt.HZFileInfo = []models.HZFileHeadInfo{}
+func (cf *GYFile) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.GYFileHeadInfo, gerror.IError) {
+	cf.FileStrt.GYFileInfo = []models.GYFileHeadInfo{}
 	dbc := gormdb.GetInstance()
 	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
@@ -191,11 +190,12 @@ func (cf *HZFile) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.HZFileHeadI
 	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
 	dbt.DB().Ping()
 
-	b := models.HZFileHeadInfo{}
+	b := models.GYFileHeadInfo{}
 	tfr := models.Tbl_tfr_his_trn_log{}
 	tran := models.Tran_logs{}
+	tran_noti := models.Tran_logs{}
 	mcht := models.Tbl_mcht_bankaccount{}
-	bank := models.Tbl_bank_bin_inf{}
+	//bank := models.Tbl_bank_bin_inf{}
 	/*err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 	if err != nil {
 		logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
@@ -225,39 +225,45 @@ func (cf *HZFile) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.HZFileHeadI
 	if err != nil {
 		logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
 	}
-	//fmt.Println(tran.ISS_INS_ID_CD)
-	err = dbc.Where("INS_ID_CD = ?", tran.ISS_INS_ID_CD).First(&bank).Error
+	tran_cd := "6201"
+	err = dbt.Where("orig_sys_order_id = ? and tran_cd = ?", SYS_ID, tran_cd).Find(&tran_noti).Error
 	if err != nil {
-		logr.Infof("dbc find failed, INS_ID_CD = %s, err = %s", bank.INS_ID_NM, err)
+		logr.Info("db tran_logs find orig_sys_order_id failed:%s\n", err)
 	}
-	b.KEY_RSP = tc.KEY_RSP
-	b.MasterAcccount = mcht.ACCOUNT
-	b.SubAccount = tran.Ext_fld7
-	b.TranDate = string([]byte(tran.TRAN_DT_TM)[:8])
-	b.TranTime = string([]byte(tran.TRAN_DT_TM)[8:])
-	if tran.CURR_CD =="156"{
-		b.Currency = "RMB"
-	}else{
-		b.Currency = "其他"
+
+	b.STLM_DATE = cf.STLM_DATE
+	b.TRAN_CD = tran.TRAN_CD
+	b.JC_BIZ_CD = tran.CUST_ORDER_ID
+	b.MCHT_CD = tran.MCHT_CD
+	b.TERM_ID = tran.TERM_ID
+	set_amt := strings.Split(tc.MCHT_SET_AMT,".")
+	for _,v := range set_amt{
+		b.PAY_AMT += v
 	}
+	//set_amt_str := set_amt[0]+set_amt[1]
+/*	set_amt,_ := strconv.ParseFloat(tc.MCHT_SET_AMT,64)
+	set_amt_str := strconv.FormatFloat(set_amt*100,'f',-1,64)*/
 	//amt,_ := strconv.ParseFloat(tran.TRAN_AMT,64)
-	//b.TranAmt = fmt.Sprintf("%.2f",amt/100)
-	b.TranAmt=tc.MCHT_SET_AMT
-	b.TranAccountName = " "
-	b.TranBankName = bank.INS_ID_NM
-	b.EXT_FLD1 = tran.PRI_ACCT_NO
-	b.EXT_FLD2 = " "
+	//b.PAY_AMT = fmt.Sprintf("%.2f",amt/100)
+	b.SYS_ORDER_ID = tran.SYS_ORDER_ID
+	b.ZZJ_ORDER_ID = tran_noti.INS_ORDER_ID
+	b.ACC_AMOUNT = tran.PRI_ACCT_NO
+	b.TRAN_TM = tran.TRAN_DT_TM[8:]
+	b.JC_KIND = "1"
+	b.JC_TYPE = "2"
+	b.BANK_CD = ""
+	b.SUP_AMOUNT = ""
 	return &b, nil
 }
 
-func (cf *HZFile) geneFile() string {
+func (cf *GYFile) geneFile() string {
 	cf.FileName = cf.FileName + cf.STLM_DATE+".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
 }
 
-func (cf *HZFile) GetInsIdCd() (string, bool) {
+func (cf *GYFile) GetInsIdCd() (string, bool) {
 	l := len(cf.Ins_id_cd)
 	if l == 0 {
 		return "", false
@@ -270,7 +276,7 @@ func (cf *HZFile) GetInsIdCd() (string, bool) {
 	return cf.MCHT_CD, true
 }
 
-func (cf *HZFile) postToSftp(fileName string, fileData io.Reader) {
+func (cf *GYFile) postToSftp(fileName string, fileData io.Reader) {
 
 	data, err := ioutil.ReadAll(fileData)
 	dbc := gormdb.GetInstance()
@@ -335,11 +341,5 @@ func (cf *HZFile) postToSftp(fileName string, fileData io.Reader) {
 			}
 		}
 	}
-}
-
-/*UTF8 转码到 GBK*/
-func UTF8tGBK(src string) string {
-	u2g := mahonia.NewEncoder("GBK")
-	return u2g.ConvertString(src)
 }
 
