@@ -292,7 +292,7 @@ func (cf *JinanZJFile) saveDatatoFStru() gerror.IError {
 	for _, tc := range cf.Tbl_Clear_Data {
 		b := models.KMBody{}
 		tfr := models.Tbl_tfr_his_trn_log{}
-		//tran := models.Tran_logs{}
+		tran := models.Tran_logs{}
 		tgi := models.Tbl_group_info{}
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 		if err != nil {
@@ -325,11 +325,11 @@ func (cf *JinanZJFile) saveDatatoFStru() gerror.IError {
 					continue
 				}*/
 		b.MCHT_SET_AMT = tc.MCHT_SET_AMT //交易结算资金
-		/*		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
-				if err != nil {
-					logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
-				}
-				logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.CUST_ORDER_ID)*/
+		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
+		if err != nil {
+			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
+		}
+		logr.Infof("sys_order_id=%s", b.SYS_ID)
 		err = dbc.Where("MCHT_CD = ? AND TERM_ID = ?", tc.MCHT_CD, tc.TERM_ID).Find(&tgi).Error
 		if err != nil {
 			logr.Info("tbl_group_info find shop_account failed:%s\n", err)
@@ -337,8 +337,8 @@ func (cf *JinanZJFile) saveDatatoFStru() gerror.IError {
 
 		b.GF_BIZ_CD = tgi.SHOP_ACCOUNT //购房业务编码
 		b.CUST_ORDER_ID = ""           //第三方订单号
-		//b.EXT_FLD1 = tran.PRI_ACCT_NO										//付款卡号
-		b.EXT_FLD1 = "" //备注1
+		b.EXT_FLD1 = tran.PRI_ACCT_NO  //付款卡号
+		//b.EXT_FLD1 = "" //备注1
 		b.EXT_FLD2 = "" //备注2
 		b.EXT_FLD3 = "" //备注3
 		b.EXT_FLD4 = "" //备注4
