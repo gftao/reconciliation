@@ -76,8 +76,8 @@ func (g *GenFileTemp) Run() {
 						g.Action = &ShijiazhuangZJFile{}*/
 		case "13": //贵阳住建局
 			g.Action = &GYFile{}
-		case "14": //上海科技馆
-			g.Action = &SHKJGFile{}
+			/*		case "14": //上海科技馆
+					g.Action = &SHKJGFile{}*/
 		case "15": //济南住建局
 			g.Action = &JinanZJFile{}
 		default:
