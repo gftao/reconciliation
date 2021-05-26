@@ -71,7 +71,7 @@ func (cf *ShijiazhuangZJFile) indb() {
 	dbname := config.StringDefault("db.dbname", "prodPmpCld")
 	dbuser := config.StringDefault("db.user", "root")
 	dbpasswd := config.StringDefault("db.passwd", "")
-	dbpasswd = models.DbpsDecrypt(dbpasswd)
+	//dbpasswd = models.DbpsDecrypt(dbpasswd)
 	connStr := dbuser + ":" + dbpasswd + "@tcp(" + dbhost + ":" + dbport + ")/" + dbname +
 		"?charset=utf8&parseTime=True&loc=Local"
 
