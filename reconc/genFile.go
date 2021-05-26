@@ -71,9 +71,9 @@ func (g *GenFile) Run() {
 		case "10": //衢州住建局
 			g.Action = &QuzhouZJFile{}
 			/*		case "11": //成都住建局
-						g.Action = &ChengduZJFile{}
-					case "12": //石家庄住建局
-						g.Action = &ShijiazhuangZJFile{}*/
+					g.Action = &ChengduZJFile{}*/
+		case "12": //石家庄住建局
+			g.Action = &ShijiazhuangZJFile{}
 		case "13": //贵阳住建局
 			g.Action = &GYFile{}
 			/*		case "14": //上海科技馆
