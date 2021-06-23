@@ -22,13 +22,12 @@ import (
 )
 
 type JinanZJFile struct {
-	FileName             string                     //对账文件名
-	FilePath             string                     //路径
-	SysDate              string                     //当前时间
-	MCHT_CD              string                     //当前机构号
-	STLM_DATE            string                     //清算日期
-	Pay_DATE_S           string                     //划付日期
-	Pay_DATE_E           string                     //划付日期
+	FileName             string //对账文件名
+	FilePath             string //路径
+	SysDate              string //当前时间
+	MCHT_CD              string //当前机构号
+	STLM_DATE            string //清算日期
+	PAY_DATE             string
 	Ins_id_cd            []string                   //全部机构号
 	FileStrt             models.KMFileStrt          //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
@@ -39,7 +38,6 @@ type JinanZJFile struct {
 	sendto               bool
 	empty                bool //1-创建空文件
 	Area_cd              string
-	Pay_DATE             bool //是否为划付日
 }
 
 func (cf *JinanZJFile) Init(chainName string, mc string) gerror.IError {
@@ -188,7 +186,7 @@ func (cf *JinanZJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "YSFPOS_" + cf.Pay_DATE_E + ".txt"
+				name := "YSFPOS_" + cf.PAY_DATE + ".txt"
 				err = myfstp.PosByteSftp(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
@@ -199,7 +197,7 @@ func (cf *JinanZJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "YSFPOS_" + cf.Pay_DATE_E + ".txt"
+				name := "YSFPOS_" + cf.PAY_DATE + ".txt"
 				err = myftp.MyftpTSL(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
@@ -210,7 +208,7 @@ func (cf *JinanZJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "YSFPOS_" + cf.Pay_DATE_E + ".txt"
+				name := "YSFPOS_" + cf.PAY_DATE + ".txt"
 				err = myftp.Myftp(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
@@ -231,22 +229,12 @@ func (cf *JinanZJFile) ReadDate() gerror.IError {
 	var rows *sql.Rows
 	var err error
 	logr.Info(cf.MCHT_CD, "->", cf.MCHT_TP[cf.MCHT_CD])
-	if cf.Pay_DATE {
-		if cf.MCHT_TP[cf.MCHT_CD] == "0" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and (STLM_DATE between ? and ? )", cf.MCHT_CD, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
-		} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and (STLM_DATE between ? and ? )", cf.MCHT_CD, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
-		} else {
-			return nil
-		}
+	if cf.MCHT_TP[cf.MCHT_CD] == "0" {
+		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ? ", cf.MCHT_CD, cf.STLM_DATE).Rows()
+	} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
+		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and and STLM_DATE = ? ", cf.MCHT_CD, cf.STLM_DATE).Rows()
 	} else {
-		if cf.MCHT_TP[cf.MCHT_CD] == "0" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
-		} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
-		} else {
-			return nil
-		}
+		return nil
 	}
 
 	defer rows.Close()
@@ -304,7 +292,7 @@ func (cf *JinanZJFile) saveDatatoFStru() gerror.IError {
 		trnrecont_T += m
 		b.MCHT_CD = tc.MCHT_CD                     //商户号
 		b.TRANS_DATE = tfr.TRANS_DT + tfr.TRANS_MT //业务发生时间
-		b.STLM_DATE = cf.Pay_DATE_E                //清算日期
+		b.STLM_DATE = cf.PAY_DATE                  //清算日期
 		b.TRANS_KIND = tc.TXN_DESC                 //交易类型
 
 		logr.Info("prod_cd:", tfr.PROD_CD)
@@ -351,7 +339,7 @@ func (cf *JinanZJFile) saveDatatoFStru() gerror.IError {
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
 
-	cf.FileStrt.KMFileHeadInfo.Stlm_date = cf.Pay_DATE_E
+	cf.FileStrt.KMFileHeadInfo.Stlm_date = cf.PAY_DATE
 	cf.FileStrt.KMFileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64) //交易总结算额
 	logr.Info("成功总笔数:", record)
 
@@ -381,7 +369,7 @@ func (cf *JinanZJFile) geneFile() string {
 	}
 
 	//cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + "摘要" + ".txt"
-	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + ".txt"
+	cf.FileName = cf.FileName + "_" + cf.PAY_DATE + ".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
@@ -413,15 +401,16 @@ func (cf *JinanZJFile) InitMCHTCd(mc string) gerror.IError {
 		cf.empty = v[0] == "1"
 		cf.Area_cd = v[1]
 	}
-	th := models.TBL_HOLI_INF{}
+	//th := models.TBL_HOLI_INF{}
 	od, _ := time.ParseDuration("24h")
 	std, err := time.ParseInLocation("20060102", cf.STLM_DATE, time.Local)
 	if err != nil {
 		return gerror.NewR(1001, err, "\033[0;31m"+"假期解析失败"+"\033[0m \n")
 	}
 	py := std.Add(od).Format("20060102")
+	cf.PAY_DATE = py
 
-	err = dbc.Where("START_DATE <= ? and ? <= END_DATE", py, py).Find(&th).Error
+	/*err = dbc.Where("START_DATE <= ? and ? <= END_DATE", py, py).Find(&th).Error
 	if err == gorm.ErrRecordNotFound {
 		cf.Pay_DATE_S = py
 		cf.Pay_DATE_E = py
@@ -445,7 +434,7 @@ func (cf *JinanZJFile) InitMCHTCd(mc string) gerror.IError {
 		cf.Pay_DATE_S = td.Add(dd).Format("20060102")
 		cf.Pay_DATE_E = py
 		logr.Infof("商户[%s]假期[%s-%s][%s]合并,划付日期为:%v", mc, cf.Pay_DATE_S, cf.STLM_DATE, th.HOLIDAY_DSP, cf.Pay_DATE_E)
-	}
+	}*/
 
 	logr.Info("初始化商户号:", cf.MCHT_TP)
 	return nil
