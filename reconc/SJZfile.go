@@ -189,30 +189,15 @@ func (cf *ShijiazhuangZJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "YSFPOS_" + cf.Pay_DATE_E + ".txt"
-				err = myfstp.PosByteSftp(user, password, host, port, name+".finish", rmtDir, []byte{})
-				if err != nil {
-					logr.Error(err)
-				}
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "450016002021051_" + cf.Pay_DATE_E + ".txt"
-				err = myftp.MyftpTSL(user, password, host, port, name+".finish", rmtDir, []byte{})
-				if err != nil {
-					logr.Error(err)
-				}
 			case "2":
 				logr.Infof("FTP without TLS:")
 				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, fileData)
-				if err != nil {
-					logr.Error(err)
-				}
-				name := "450016002021051_" + cf.Pay_DATE_E + ".txt"
-				err = myftp.Myftp(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
 				}
@@ -365,7 +350,7 @@ func (cf *ShijiazhuangZJFile) geneFile() string {
 	cd, ok := cf.GetInsIdCd()
 	if ok {
 		//cf.FileName = "YSFPOS_" + cd
-		cf.FileName = "450016002021051" //中间业务编码
+		cf.FileName = cd //中间业务编码
 	} else {
 		return ""
 	}
