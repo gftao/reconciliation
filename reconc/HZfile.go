@@ -1,28 +1,29 @@
 package reconc
 
 import (
-	"golib/modules/logr"
-	"htdRec/models"
+	"github.com/axgle/mahonia"
+	"github.com/jinzhu/gorm"
 	"golib/gerror"
 	"golib/modules/config"
-	"github.com/jinzhu/gorm"
 	"golib/modules/gormdb"
-	"io/ioutil"
-	"os"
-	"strings"
+	"golib/modules/logr"
+	"htdRec/models"
 	"htdRec/myfstp"
 	"htdRec/myftp"
 	"io"
+	"io/ioutil"
+	"os"
+	"strings"
 )
 
-type Ecosph struct {
+type HZFile struct {
 	FileName             string                     //对账文件名
 	FilePath             string                     //路径
 	SysDate              string                     //当前时间
 	MCHT_CD              string                     //当前机构号
 	STLM_DATE            string                     //清算日期
 	Ins_id_cd            []string                   //全部机构号
-	FileStrt             []models.FileStrtEchos     //文件结构
+	FileStrt             models.HZFileStrt     //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
@@ -32,12 +33,13 @@ type Ecosph struct {
 	dbt                  *gorm.DB
 }
 
-func (cf *Ecosph) Init(chainName string, mc string) gerror.IError {
-	cf.FileName = "stqtxn_"
+func (cf *HZFile) Init(chainName string, mc string) gerror.IError {
+	cf.FileName = "HUZSPFYSPOS_"
 	cf.FilePath = config.StringDefault("filePath", "")
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
 	cf.STLM_DATE = chainName //清算日期
+	cf.FileStrt.Init()
 	//cf.MCHT_TP = make(map[string]string, 1)
 	cf.MCHT_CD = mc
 	err := cf.InitMCHTCd(mc)
@@ -48,7 +50,7 @@ func (cf *Ecosph) Init(chainName string, mc string) gerror.IError {
 	return nil
 }
 
-func (cf *Ecosph) indb() {
+func (cf *HZFile) indb() {
 	config.SetSection("db1")
 	dbtype := config.StringDefault("db.type", "mysql")
 	dbhost := config.StringDefault("db.host", "127.0.0.1")
@@ -74,7 +76,7 @@ func (cf *Ecosph) indb() {
 	cf.dbt.DB().Ping()
 }
 
-func (cf *Ecosph) InitMCHTCd(mc string) gerror.IError {
+func (cf *HZFile) InitMCHTCd(mc string) gerror.IError {
 
 	//商户号
 	dbc := gormdb.GetInstance()
@@ -99,7 +101,7 @@ func (cf *Ecosph) InitMCHTCd(mc string) gerror.IError {
 	return nil
 }
 
-func (cf *Ecosph) Run() {
+func (cf *HZFile) Run() {
 	defer cf.dbt.Close()
 
 	gerr := cf.SaveToFile()
@@ -109,7 +111,7 @@ func (cf *Ecosph) Run() {
 	return
 }
 
-func (cf *Ecosph) SaveToFile() gerror.IError {
+func (cf *HZFile) SaveToFile() gerror.IError {
 
 	//创建文件
 	fn := cf.geneFile()
@@ -139,18 +141,20 @@ func (cf *Ecosph) SaveToFile() gerror.IError {
 	return nil
 }
 
-func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
+func (cf *HZFile) ReadDate(fp *os.File) gerror.IError {
 	dbc := gormdb.GetInstance()
 
 	rows, err := dbc.Raw("SELECT * FROM tbl_clear_txn  WHERE STLM_DATE = ? and MCHT_CD in (?) ", cf.STLM_DATE, cf.Ins_id_cd).Rows()
 	defer rows.Close()
 	if err == gorm.ErrRecordNotFound {
-		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
+		return gerror.NewR(1000, err, "查对账数据失败:%s", err)
 	}
 	if err != nil {
-		return gerror.NewR(1000, err, "查 对账数据失败:%s", err)
+		return gerror.NewR(1000, err, "查对账数据失败:%s", err)
 	}
-	logr.Infof("--读取生态圈数据---")
+	//.Println(cf.FileStrt.FileHead)
+	fp.WriteString(UTF8tGBK(cf.FileStrt.FileHead) + "\r\n")
+	logr.Infof("--读取湖州住建数据---")
 	for rows.Next() {
 		tc := models.Tbl_clear_txn{}
 		dbc.ScanRows(rows, &tc)
@@ -166,7 +170,8 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 		}
 		//logr.Infof("KEY_RSP=%s", tc.KEY_RSP)
 		//logr.Infof("%s", b.ToString())
-		fp.WriteString(b.ToString() + "\n")
+		logr.Infof("[%s]",b.HToString())
+		fp.WriteString(UTF8tGBK(b.HToString()) + "\n")
 	}
 	l, _ := fp.Seek(-1, 2)
 	fp.Truncate(l)
@@ -174,71 +179,85 @@ func (cf *Ecosph) ReadDate(fp *os.File) gerror.IError {
 	return nil
 }
 
-func (cf *Ecosph) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.FileStrtEchos, gerror.IError) {
-	cf.FileStrt = []models.FileStrtEchos{}
+func (cf *HZFile) saveDatatoFStru(tc *models.Tbl_clear_txn) (*models.HZFileHeadInfo, gerror.IError) {
+	cf.FileStrt.HZFileInfo = []models.HZFileHeadInfo{}
 	dbc := gormdb.GetInstance()
+	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
+	if err != nil {
+		logr.Info(err)
+		return nil,gerror.NewR(1000, err, "打开数据库链接失败")
+	}
+	defer dbt.Close()
+	dbt = dbt.Set("gorm:table_options", "ENGINE=InnoDB")
+	dbt.DB().Ping()
 
-	b := models.FileStrtEchos{}
+	b := models.HZFileHeadInfo{}
 	tfr := models.Tbl_tfr_his_trn_log{}
 	tran := models.Tran_logs{}
-
-	err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
+	mcht := models.Tbl_mcht_bankaccount{}
+	bank := models.Tbl_bank_bin_inf{}
+	/*err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 	if err != nil {
-		return nil, gerror.NewR(1000, err, "dbc find failed, KEY_RSP %s failed", tc.KEY_RSP)
+		logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
+		continue
+	}*/
+	err = dbc.Where("owner_cd = ?", tc.MCHT_CD).Find(&mcht).Error
+	if err != nil {
+		logr.Infof("dbc find failed, owner_cd = %s, err = %s", tc.MCHT_CD, err)
 	}
-	b.Stlm_date = cf.STLM_DATE
-	b.MCHT_CD = tc.MCHT_CD
-	b.TERM_ID = tc.TERM_ID
-	b.TRANS_TIME = tfr.TRANS_DT[4:] + tfr.TRANS_MT
-	b.PAN = tc.PAN
-	b.Resp_cd = "00"
-	var sysId string
+	var SYS_ID string
+	err = dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
+	if err != nil {
+		logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
+	}
+	logr.Info("prod_cd:", tfr.PROD_CD)
 	if tfr.PROD_CD == "1151" {
-		sysId = tfr.INDUSTRY_ADDN_INF
-
+		SYS_ID = tfr.INDUSTRY_ADDN_INF
 	} else {
 		if tfr.RETRI_REF_NO[:1] == cf.STLM_DATE[3:4] {
-			sysId = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
+			SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 		} else {
-			sysId = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
+			SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
 		}
 	}
-	b.KEY_RSP = sysId
-
-	b.CARD_KIND_DIS = models.CARDConvert[tfr.BIZ_CD]
-	b.TRAND_CD = tfr.MA_TRANS_CD
-	switch b.TRAND_CD[:1] {
-	case "1":
-		b.TRANS_AMT = tc.TRANS_AMT
-	case "2", "3":
-		b.TRANS_AMT = tc.TRANS_AMT[1:]
-	}
-	b.TRAND_CD = models.TranCdConvert[b.TRAND_CD]
-	err = cf.dbt.Where("sys_order_id = ?", sysId).Find(&tran).Error
+	//fmt.Println(SYS_ID)
+	err = dbt.Where("sys_order_id = ?", SYS_ID).Find(&tran).Error
 	if err != nil {
-		logr.Info("查询sys_order_id[%s]失败:%s\n", sysId, err)
+		logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
 	}
-	logr.Infof("KEY_RSP=%s,sys_order_id=%s, cust_order_id=%s", tc.KEY_RSP, sysId, tran.CUST_ORDER_ID)
-	if strings.HasPrefix(tran.CUST_ORDER_ID, "spdb_ecosph") {
-		b.CUST_ORDER_ID = strings.TrimPrefix(tran.CUST_ORDER_ID, "spdb_ecosph")
-	} else {
-		b.CUST_ORDER_ID = ""
+	//fmt.Println(tran.ISS_INS_ID_CD)
+	err = dbc.Where("INS_ID_CD = ?", tran.ISS_INS_ID_CD).First(&bank).Error
+	if err != nil {
+		logr.Infof("dbc find failed, INS_ID_CD = %s, err = %s", bank.INS_ID_NM, err)
 	}
-	b.Stl_flag = "0"
+	b.KEY_RSP = tc.KEY_RSP
+	b.MasterAcccount = mcht.ACCOUNT
+	b.SubAccount = tran.Ext_fld7
+	b.TranDate = string([]byte(tran.TRAN_DT_TM)[:8])
+	b.TranTime = string([]byte(tran.TRAN_DT_TM)[8:])
+	if tran.CURR_CD =="156"{
+		b.Currency = "RMB"
+	}else{
+		b.Currency = "其他"
+	}
+	//amt,_ := strconv.ParseFloat(tran.TRAN_AMT,64)
+	//b.TranAmt = fmt.Sprintf("%.2f",amt/100)
+	b.TranAmt=tc.MCHT_SET_AMT
+	b.TranAccountName = " "
+	b.TranBankName = bank.INS_ID_NM
+	b.EXT_FLD1 = tran.PRI_ACCT_NO
+	b.EXT_FLD2 = " "
 	return &b, nil
 }
 
-func (cf *Ecosph) geneFile() string {
-	cf.FileName = cf.FileName + cf.STLM_DATE
+func (cf *HZFile) geneFile() string {
+	cf.FileName = cf.FileName + cf.STLM_DATE+".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
 }
 
-func (cf *Ecosph) GetInsIdCd() (string, bool) {
+func (cf *HZFile) GetInsIdCd() (string, bool) {
 	l := len(cf.Ins_id_cd)
 	if l == 0 {
 		return "", false
@@ -251,10 +270,10 @@ func (cf *Ecosph) GetInsIdCd() (string, bool) {
 	return cf.MCHT_CD, true
 }
 
-func (cf *Ecosph) postToSftp(fileName string, fileData io.Reader) {
+func (cf *HZFile) postToSftp(fileName string, fileData io.Reader) {
 
-	dbc := gormdb.GetInstance()
 	data, err := ioutil.ReadAll(fileData)
+	dbc := gormdb.GetInstance()
 	rows, err := dbc.Raw("SELECT * FROM tbl_mcht_recon_list WHERE MCHT_CD = ?", cf.MCHT_CD).Rows()
 	if err != nil {
 		logr.Info("dbc find failed:", err)
@@ -311,10 +330,16 @@ func (cf *Ecosph) postToSftp(fileName string, fileData io.Reader) {
 				if err != nil {
 					logr.Error(err)
 				}
-
 			default:
 				logr.Infof("default FTP is not support")
 			}
 		}
 	}
 }
+
+/*UTF8 转码到 GBK*/
+func UTF8tGBK(src string) string {
+	u2g := mahonia.NewEncoder("GBK")
+	return u2g.ConvertString(src)
+}
+

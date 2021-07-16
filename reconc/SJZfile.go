@@ -1,26 +1,27 @@
 package reconc
 
 import (
-	"golib/gerror"
-	"golib/modules/gormdb"
-	"github.com/jinzhu/gorm"
-	"htdRec/models"
-	"golib/modules/config"
 	"bufio"
-	"strconv"
-	"htdRec/myfstp"
 	"bytes"
+	"golib/gerror"
+	"golib/modules/config"
+	"golib/modules/gormdb"
+	"htdRec/models"
+	"htdRec/myfstp"
+	"strconv"
 	"strings"
 
-	"golib/modules/logr"
+	"github.com/jinzhu/gorm"
+
 	"database/sql"
-	"htdRec/myftp"
+	"golib/modules/logr"
 	"golib/security"
-	"time"
+	"htdRec/myftp"
 	"os"
+	"time"
 )
 
-type FuzhouFJFile struct {
+type ShijiazhuangZJFile struct {
 	FileName             string                     //对账文件名
 	FilePath             string                     //路径
 	SysDate              string                     //当前时间
@@ -29,27 +30,27 @@ type FuzhouFJFile struct {
 	Pay_DATE_S           string                     //划付日期
 	Pay_DATE_E           string                     //划付日期
 	Ins_id_cd            []string                   //全部机构号
-	FileStrt             models.FuzhouStrt          //文件结构
+	FileStrt             models.SJZFileStrt         //文件结构
 	Tbl_Clear_Data       []models.Tbl_clear_txn     //当前机构号数据
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
 	dbstr                string
-	MCHT_TP              map[string]string
+	MCHT_TP              string
 	sendto               bool
 	empty                bool //1-创建空文件
 	Area_cd              string
 	Pay_DATE             bool //是否为划付日
 }
 
-func (cf *FuzhouFJFile) Init(chainName string, mc string) gerror.IError {
+func (cf *ShijiazhuangZJFile) Init(chainName string, mc string) gerror.IError {
 	cf.FilePath = config.StringDefault("filePath", "")
 	cf.sendto = config.BoolDefault("sendto", true)
 	logr.Info("是否发送ftp：", cf.sendto)
 
 	cf.SysDate = time.Now().Format("20060102") //今天
-	cf.FileStrt = models.FuzhouStrt{}
+	cf.FileStrt = models.SJZFileStrt{}
 	cf.STLM_DATE = chainName //清算日期
-	cf.MCHT_TP = make(map[string]string, 1)
+	//cf.MCHT_TP = make(map[string]string, 1)
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.MCHT_CD = mc
@@ -61,7 +62,7 @@ func (cf *FuzhouFJFile) Init(chainName string, mc string) gerror.IError {
 	return nil
 }
 
-func (cf *FuzhouFJFile) indb() {
+func (cf *ShijiazhuangZJFile) indb() {
 	//"prodPmpCld:prodPmpCld@tcp(192.168.20.60:3306)/prodPmpCld?charset=utf8&parseTime=True&loc=Local"
 	config.SetSection("db1")
 	dbtype := config.StringDefault("db.type", "mysql")
@@ -70,6 +71,7 @@ func (cf *FuzhouFJFile) indb() {
 	dbname := config.StringDefault("db.dbname", "prodPmpCld")
 	dbuser := config.StringDefault("db.user", "root")
 	dbpasswd := config.StringDefault("db.passwd", "")
+	//dbpasswd = models.DbpsDecrypt(dbpasswd)
 	connStr := dbuser + ":" + dbpasswd + "@tcp(" + dbhost + ":" + dbport + ")/" + dbname +
 		"?charset=utf8&parseTime=True&loc=Local"
 
@@ -78,7 +80,7 @@ func (cf *FuzhouFJFile) indb() {
 	logr.Info("[db1]：", cf.dbtype, cf.dbstr)
 }
 
-func (cf *FuzhouFJFile) Run() {
+func (cf *ShijiazhuangZJFile) Run() {
 
 	gerr := cf.SaveToFile()
 	if gerr != nil {
@@ -86,7 +88,7 @@ func (cf *FuzhouFJFile) Run() {
 	}
 	return
 }
-func (cf *FuzhouFJFile) SaveToFile() gerror.IError {
+func (cf *ShijiazhuangZJFile) SaveToFile() gerror.IError {
 	//读数据
 	gerr := cf.ReadDate()
 	if gerr != nil {
@@ -140,7 +142,7 @@ func (cf *FuzhouFJFile) SaveToFile() gerror.IError {
 	return nil
 }
 
-func (cf *FuzhouFJFile) postToSftp(fileName string, fileData []byte) {
+func (cf *ShijiazhuangZJFile) postToSftp(fileName string, fileData []byte) {
 
 	dbc := gormdb.GetInstance()
 
@@ -182,25 +184,24 @@ func (cf *FuzhouFJFile) postToSftp(fileName string, fileData []byte) {
 
 			switch trans_ty {
 			case "0":
-				logr.Infof("SFTP:%d", FZFGMCT)
+				logr.Infof("SFTP:")
 				err = myfstp.PosByteSftp(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
 				}
-				if FZFGMCT--; FZFGMCT == 0 {
-					err = myfstp.PosByteSftp(user, password, host, port, "YSFPOS_"+cf.Pay_DATE_E+".finish", rmtDir, []byte{})
-					if err != nil {
-						logr.Error(err)
-					}
+				name := "YSFPOS_" + cf.Pay_DATE_E + ".txt"
+				err = myfstp.PosByteSftp(user, password, host, port, name+".finish", rmtDir, []byte{})
+				if err != nil {
+					logr.Error(err)
 				}
-
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
 				}
-				err = myftp.MyftpTSL(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				name := "450016002021051_" + cf.Pay_DATE_E + ".txt"
+				err = myftp.MyftpTSL(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
 				}
@@ -210,7 +211,8 @@ func (cf *FuzhouFJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				err = myftp.Myftp(user, password, host, port, fileName+".finish", rmtDir, []byte{})
+				name := "450016002021051_" + cf.Pay_DATE_E + ".txt"
+				err = myftp.Myftp(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
 				}
@@ -221,31 +223,19 @@ func (cf *FuzhouFJFile) postToSftp(fileName string, fileData []byte) {
 	}
 }
 
-func (cf *FuzhouFJFile) Finish() {
+func (cf *ShijiazhuangZJFile) Finish() {
 	return
 }
 
-func (cf *FuzhouFJFile) ReadDate() gerror.IError {
+func (cf *ShijiazhuangZJFile) ReadDate() gerror.IError {
 	dbc := gormdb.GetInstance()
 	var rows *sql.Rows
 	var err error
-	logr.Info(cf.MCHT_CD, "->", cf.MCHT_TP[cf.MCHT_CD])
+	//logr.Info(cf.MCHT_CD, "->", cf.MCHT_TP[cf.MCHT_CD])
 	if cf.Pay_DATE {
-		if cf.MCHT_TP[cf.MCHT_CD] == "0" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and (STLM_DATE between ? and ? )", cf.MCHT_CD, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
-		} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and (STLM_DATE between ? and ? )", cf.MCHT_CD, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
-		} else {
-			return nil
-		}
+		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD in (?) and (STLM_DATE between ? and ? )", cf.Ins_id_cd, cf.Pay_DATE_S, cf.STLM_DATE).Rows()
 	} else {
-		if cf.MCHT_TP[cf.MCHT_CD] == "0" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
-		} else if cf.MCHT_TP[cf.MCHT_CD] == "1" {
-			rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE JT_MCHT_CD = ? and STLM_DATE = ?", cf.MCHT_CD, cf.STLM_DATE).Rows()
-		} else {
-			return nil
-		}
+		rows, err = dbc.Raw("SELECT * FROM tbl_clear_txn WHERE MCHT_CD in (?) and STLM_DATE = ?", cf.Ins_id_cd, cf.STLM_DATE).Rows()
 	}
 
 	defer rows.Close()
@@ -261,9 +251,8 @@ func (cf *FuzhouFJFile) ReadDate() gerror.IError {
 		dbc.ScanRows(rows, &tc)
 		cf.Tbl_Clear_Data = append(cf.Tbl_Clear_Data, tc)
 	}
-	if len(cf.Tbl_Clear_Data) > 0 || cf.empty {
-		cf.FileStrt.FileHeadInfo.Area_CD = cf.Area_cd
-	} else {
+	//fmt.Println(cf.Tbl_Clear_Data)
+	if len(cf.Tbl_Clear_Data) < 0 {
 		return gerror.NewR(0000, err, "MCHT_CD[%s]记录不存在", cf.MCHT_CD)
 	}
 
@@ -274,9 +263,9 @@ func (cf *FuzhouFJFile) ReadDate() gerror.IError {
 	return nil
 }
 
-func (cf *FuzhouFJFile) saveDatatoFStru() gerror.IError {
+func (cf *ShijiazhuangZJFile) saveDatatoFStru() gerror.IError {
 	//cf.FileStrt.FileBodys = make([]models.Body,0)
-	cf.FileStrt.FileBodys = []models.FuzhouBody{}
+	cf.FileStrt.FileBodys = []models.SJZBody{}
 	dbc := gormdb.GetInstance()
 	dbt, err := gorm.Open(cf.dbtype, cf.dbstr)
 	if err != nil {
@@ -289,68 +278,77 @@ func (cf *FuzhouFJFile) saveDatatoFStru() gerror.IError {
 	record := 0        //交易总笔数
 	trnrecont_T := 0.0 //结算总金额
 	for _, tc := range cf.Tbl_Clear_Data {
-		b := models.FuzhouBody{}
+		b := models.SJZBody{}
 		tfr := models.Tbl_tfr_his_trn_log{}
 		tran := models.Tran_logs{}
+		tran_noti := models.Tran_logs{}
 		err := dbc.Where("KEY_RSP = ?", tc.KEY_RSP).Find(&tfr).Error
 		if err != nil {
 			logr.Infof("dbc find failed, KEY_RSP = %s, err = %s", tc.KEY_RSP, err)
 			continue
 		}
-		record ++
 		m, _ := strconv.ParseFloat(tc.MCHT_SET_AMT, 64)
 		trnrecont_T += m
-		b.MCHT_CD = tc.MCHT_CD
-		b.TRANS_DATE = tfr.TRANS_DT + tfr.TRANS_MT
-		b.STLM_DATE = cf.Pay_DATE_E
-		b.TRANS_KIND = tc.TXN_DESC
-		b.MCHT_SET_AMT = tc.MCHT_SET_AMT
+
 		logr.Info("prod_cd:", tfr.PROD_CD)
 		if tfr.PROD_CD == "1151" {
-			b.SYS_ID = tfr.INDUSTRY_ADDN_INF
+			b.SysId = tfr.INDUSTRY_ADDN_INF
 		} else {
 			if tfr.RETRI_REF_NO[:1] == cf.STLM_DATE[3:4] {
-				b.SYS_ID = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
+				b.SysId = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			} else {
-				b.SYS_ID = cf.STLM_DATE[:4] + tfr.RETRI_REF_NO
+				b.SysId = cf.STLM_DATE[:3] + tfr.RETRI_REF_NO
 			}
 		}
-
-		err = dbt.Where("sys_order_id = ?", b.SYS_ID).Find(&tran).Error
+		TRAND_CD := tfr.MA_TRANS_CD
+		switch TRAND_CD[:1] {
+		case "1", "2", "3":
+			err = dbt.Where("sys_order_id = ?", b.SysId).Find(&tran).Error
+			if err != nil {
+				logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
+			}
+			logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SysId, tran.CUST_ORDER_ID)
+			//continue
+		}
+		tran_cd := "6201"
+		err = dbt.Where("orig_sys_order_id = ? and tran_cd = ?", b.SysId, tran_cd).Find(&tran_noti).Error
 		if err != nil {
-			logr.Info("db tran_logs find sys_order_id failed:%s\n", err)
+			logr.Info("db tran_logs find orig_sys_order_id failed:%s\n", err)
 		}
-		logr.Infof("sys_order_id=%s, cust_order_id=%s", b.SYS_ID, tran.Ext_fld7)
-		if tran.Ext_fld7 != "" {
-			e7 := strings.Split(tran.Ext_fld7, ",")
-			for i, _ := range e7 {
-				switch i {
-				case 0:
-					b.GF_BIZ_CD = strings.Split(e7[i], ":")[1]
-				case 1:
-					b.CUST_ORDER_ID = strings.Split(e7[i], ":")[1]
-				case 2:
-					b.EXT_FLD1 = strings.Split(e7[i], ":")[1]
-				case 3:
-					b.EXT_FLD2 = strings.Split(e7[i], ":")[1]
-				case 4:
-					b.EXT_FLD3 = strings.Split(e7[i], ":")[1]
-				}
-			}
-		}
+		b.TranDate = tfr.TRANS_DT
+		b.TranTime = tfr.TRANS_MT
+		b.FrontDate = tfr.TRANS_DT
+		b.FrontId = b.SysId
+		b.Currency = "01"
+		b.CurrFlag = "1"
+		b.OutType = ""
+		b.OutAccount = tran.PRI_ACCT_NO
+		b.InType = ""
+		b.InAccount = tran.CUST_ORDER_ID //监管账号
+		b.TranAmt = tc.MCHT_SET_AMT
+		b.ThirdId = tran_noti.INS_ORDER_ID //销账返回
+		b.ThirdNo = ""
+		b.PayPeriod = "0"
+		b.TranTunnel = "03"
+		b.UserAddress = ""
+		b.Ext1 = ""
+		b.Ext2 = ""
+		b.Ext3 = ""
+		b.Ext4 = ""
+		b.Ext5 = ""
 
+		record++
 		cf.FileStrt.FileBodys = append(cf.FileStrt.FileBodys, b)
 	}
-
-	cf.FileStrt.FileHeadInfo.Stlm_date = cf.Pay_DATE_E
-	cf.FileStrt.FileHeadInfo.TrnReconT = strconv.FormatFloat(trnrecont_T, 'f', 2, 64)
+	cf.FileStrt.SJZFileHeadInfo.Be_biz_cd = "450016002021051"
+	cf.FileStrt.SJZFileHeadInfo.Pay_flag = "1"
+	cf.FileStrt.SJZFileHeadInfo.Total_amt = strconv.FormatFloat(trnrecont_T, 'f', 2, 64) //交易总结算额
 	logr.Info("成功总笔数:", record)
-
-	cf.FileStrt.FileHeadInfo.TrnSucCount = strconv.Itoa(record)
+	cf.FileStrt.SJZFileHeadInfo.Total_tran = strconv.Itoa(record) //成功总笔数
 	return nil
 }
 
-func (cf *FuzhouFJFile) GetInsIdCd() (string, bool) {
+func (cf *ShijiazhuangZJFile) GetInsIdCd() (string, bool) {
 	l := len(cf.Ins_id_cd)
 	if l == 0 {
 		return "", false
@@ -363,23 +361,22 @@ func (cf *FuzhouFJFile) GetInsIdCd() (string, bool) {
 	return cf.MCHT_CD, true
 }
 
-func (cf *FuzhouFJFile) geneFile() string {
+func (cf *ShijiazhuangZJFile) geneFile() string {
 	cd, ok := cf.GetInsIdCd()
 	if ok {
-		cf.FileName = "YSFPOS_" + cd
+		//cf.FileName = "YSFPOS_" + cd
+		cf.FileName = "450016002021051" //中间业务编码
 	} else {
 		return ""
 	}
-
-	//cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + "摘要" + ".txt"
-	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + ".txt"
+	logr.Info("商户号：", cd)
+	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + ".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
 }
 
-func (cf *FuzhouFJFile) InitMCHTCd(mc string) gerror.IError {
-
+func (cf *ShijiazhuangZJFile) InitMCHTCd(mc string) gerror.IError {
 	//商户号
 	dbc := gormdb.GetInstance()
 	tbrec := models.Tbl_mcht_recon_list{}
@@ -394,10 +391,10 @@ func (cf *FuzhouFJFile) InitMCHTCd(mc string) gerror.IError {
 		return gerror.NewR(1000, err, "商户[%s]对账信息查询失败:%s", mc, err)
 	}
 	logr.Info("对账配置表:%+v\n", tbrec)
-	if mc != "" {
+	/*	if mc != "" {
 		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
 		cf.MCHT_TP[mc] = tbrec.Mcht_ty
-	}
+	}*/
 	if strings.ContainsAny(tbrec.EXT3, "[]") {
 		tbrec.EXT3 = strings.Trim(tbrec.EXT3, "[]")
 		v := strings.Split(tbrec.EXT3, ",")
@@ -421,6 +418,7 @@ func (cf *FuzhouFJFile) InitMCHTCd(mc string) gerror.IError {
 		logr.Infof("商户[%s]划付日期查询失败:%s", mc, err)
 		return gerror.NewR(1000, err, "商户[%s]划付日期查询失败:%s", mc, err)
 	} else {
+		//判断是否为划付日
 		if py == th.END_DATE {
 			cf.Pay_DATE = true
 		} else {
@@ -437,6 +435,12 @@ func (cf *FuzhouFJFile) InitMCHTCd(mc string) gerror.IError {
 		logr.Infof("商户[%s]假期[%s-%s][%s]合并,划付日期为:%v", mc, cf.Pay_DATE_S, cf.STLM_DATE, th.HOLIDAY_DSP, cf.Pay_DATE_E)
 	}
 
-	logr.Info("初始化商户号:", cf.MCHT_TP)
+	//logr.Info("初始化商户号:", cf.MCHT_TP)
+	for _, c := range strings.Split(tbrec.EXT4, ",") {
+		cf.Ins_id_cd = append(cf.Ins_id_cd, c)
+
+	}
+	cf.MCHT_TP = tbrec.Mcht_ty
+	logr.Infof("初始化商户号:[%+v][%s]", cf.Ins_id_cd, cf.MCHT_TP)
 	return nil
 }

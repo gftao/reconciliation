@@ -1,15 +1,15 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"golib/modules/config"
 	"golib/modules/gormdb"
-	"golib/modules/run"
-	"prodPmpCld/global"
-	"htdRec/reconc"
 	"golib/modules/logr"
-	"fmt"
-	"flag"
+	"golib/modules/run"
+	"htdRec/reconc"
 	"os"
+	"prodPmpCld/global"
 )
 
 type TaskList struct {
@@ -19,7 +19,7 @@ type TaskList struct {
 
 var g_taskList []TaskList = []TaskList{
 	//{"CRTFILE", &reconc.FuzhouFJFile{}},
-	{"YCRL", &reconc.GenFile{}},
+	{"YCRL", &reconc.GenFileTemp{}},
 }
 
 func main() {
@@ -57,6 +57,7 @@ func main() {
 		ac := task.Action
 		task.Name = args[1] //清算日期
 		//task.Name = "20190121"
+
 		err = ac.Init(initParam, task.Name)
 		if err != nil {
 			logr.Info("初始化失败: ", task.Name, err)

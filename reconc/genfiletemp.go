@@ -11,26 +11,22 @@ import (
 	"time"
 )
 
-var (
-	FZFGMCT int
-)
-
-type IMYRun interface {
+type IMYRunTemp interface {
 	Init(string, string) gerror.IError
 	Run()
 }
 
-type GenFile struct {
+type GenFileTemp struct {
 	STLM_DATE  string //清算日期
 	MCHT_CD    string
 	FileName   string            //对账文件名
 	MCHT_CDS   []string          //全部机构号
 	MCHT_RECTY map[string]string //1-集团商户
 	MCHT_TIMER map[string]string //定时器
-	Action     IMYRun
+	Action     IMYRunTemp
 }
 
-func (g *GenFile) Init(initParams run.InitParams, chainName string) gerror.IError {
+func (g *GenFileTemp) Init(initParams run.InitParams, chainName string) gerror.IError {
 	g.STLM_DATE = chainName //清算日期
 	g.MCHT_RECTY = make(map[string]string)
 	g.MCHT_TIMER = make(map[string]string)
@@ -42,7 +38,7 @@ func (g *GenFile) Init(initParams run.InitParams, chainName string) gerror.IErro
 	return nil
 }
 
-func (g *GenFile) Run() {
+func (g *GenFileTemp) Run() {
 	var wg sync.WaitGroup
 
 	for {
@@ -75,9 +71,9 @@ func (g *GenFile) Run() {
 		case "10": //衢州住建局
 			g.Action = &QuzhouZJFile{}
 			/*		case "11": //成都住建局
-					g.Action = &ChengduZJFile{}*/
-		case "12": //石家庄住建局
-			g.Action = &ShijiazhuangZJFile{}
+						g.Action = &ChengduZJFile{}
+					case "12": //石家庄住建局
+						g.Action = &ShijiazhuangZJFile{}*/
 		case "13": //贵阳住建局
 			g.Action = &GYFile{}
 			/*		case "14": //上海科技馆
@@ -92,7 +88,7 @@ func (g *GenFile) Run() {
 			logr.Infof("根据商户号等待时间:%v", g.MCHT_TIMER[cd])
 			wg.Add(1)
 			d, _ := time.ParseDuration(md)
-			go func(a IMYRun, duration time.Duration) {
+			go func(a IMYRunTemp, duration time.Duration) {
 				defer wg.Done()
 				//fmt.Println("duration=", duration)
 				time.Sleep(duration)
@@ -119,11 +115,11 @@ func (g *GenFile) Run() {
 	//os.Exit(0)
 }
 
-func (g *GenFile) Finish() {
+func (g *GenFileTemp) Finish() {
 
 }
 
-func (g *GenFile) InitMCHTCd() error {
+func (g *GenFileTemp) InitMCHTCd() error {
 	mc, ok := config.String("MCHT_CD")
 	if ok && mc != "" {
 		g.MCHT_CDS = append(g.MCHT_CDS, mc)
@@ -132,14 +128,11 @@ func (g *GenFile) InitMCHTCd() error {
 		g.MCHT_RECTY[mc] = mt
 		tm := config.StringDefault("MCHT_TIMER", "0")
 		g.MCHT_TIMER[mc] = tm
-		if mt == "4" {
-			FZFGMCT += 1
-		}
 		return nil
 	}
 
 	dbc := gormdb.GetInstance()
-	rows, err := dbc.Raw("SELECT distinct MCHT_CD, EXT1 FROM tbl_mcht_recon_list").Rows()
+	rows, err := dbc.Raw("SELECT distinct MCHT_CD, EXT1 FROM tbl_mcht_recon_list WHERE EXT5='1' ").Rows()
 	if err != nil {
 		logr.Info("dbc.Raw fail:%s\n", err)
 		return err
@@ -157,22 +150,18 @@ func (g *GenFile) InitMCHTCd() error {
 				switch i {
 				case 0:
 					g.MCHT_RECTY[mc] = mts[i]
-					if mts[i] == "4" {
-						FZFGMCT += 1
-					}
-
 				case 1:
 					g.MCHT_TIMER[mc] = mts[i]
 				}
 			}
 		}
 	}
+
 	logr.Infof("初始化商户号:+v", g.MCHT_RECTY)
-	logr.Infof("福州房管商户总数:%d", FZFGMCT)
 	return nil
 }
 
-func (g *GenFile) GetMCHTCd() (string, bool) {
+func (g *GenFileTemp) GetMCHTCd() (string, bool) {
 	l := len(g.MCHT_CDS)
 	if l == 0 {
 		return "", false
