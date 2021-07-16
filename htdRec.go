@@ -26,7 +26,7 @@ func main() {
 
 	flag.Parse()
 	args := os.Args //获取用户输入的所有参数
-	args = []string{"1", "20200106"}
+	//args = []string{"1", "20200824"}
 	if args == nil || len(args) < 2 || len(args[1]) != 8 {
 		fmt.Println(`请带一个格式为[20161119]的查询日期参数！`)
 		return
@@ -57,7 +57,6 @@ func main() {
 		ac := task.Action
 		task.Name = args[1] //清算日期
 		//task.Name = "20190121"
-
 		err = ac.Init(initParam, task.Name)
 		if err != nil {
 			logr.Info("初始化失败: ", task.Name, err)
