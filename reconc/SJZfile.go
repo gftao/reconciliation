@@ -35,7 +35,7 @@ type ShijiazhuangZJFile struct {
 	Tbl_Tfr_his_log_Data models.Tbl_tfr_his_trn_log //当前机构号对应交易日志
 	dbtype               string
 	dbstr                string
-	MCHT_TP              string
+	MCHT_TP              map[string]string
 	sendto               bool
 	empty                bool //1-创建空文件
 	Area_cd              string
@@ -50,7 +50,7 @@ func (cf *ShijiazhuangZJFile) Init(chainName string, mc string) gerror.IError {
 	cf.SysDate = time.Now().Format("20060102") //今天
 	cf.FileStrt = models.SJZFileStrt{}
 	cf.STLM_DATE = chainName //清算日期
-	//cf.MCHT_TP = make(map[string]string, 1)
+	cf.MCHT_TP = make(map[string]string, 1)
 	cf.FileStrt.Init()
 	//查表获取需要生产队长文件机构的机构号,新增加的表
 	cf.MCHT_CD = mc
@@ -189,30 +189,15 @@ func (cf *ShijiazhuangZJFile) postToSftp(fileName string, fileData []byte) {
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "YSFPOS_" + cf.Pay_DATE_E + ".txt"
-				err = myfstp.PosByteSftp(user, password, host, port, name+".finish", rmtDir, []byte{})
-				if err != nil {
-					logr.Error(err)
-				}
 			case "1":
 				logr.Infof("FTP with TLS:")
 				err = myftp.MyftpTSL(user, password, host, port, fileName, rmtDir, fileData)
 				if err != nil {
 					logr.Error(err)
 				}
-				name := "450016002021051_" + cf.Pay_DATE_E + ".txt"
-				err = myftp.MyftpTSL(user, password, host, port, name+".finish", rmtDir, []byte{})
-				if err != nil {
-					logr.Error(err)
-				}
 			case "2":
 				logr.Infof("FTP without TLS:")
 				err = myftp.Myftp(user, password, host, port, fileName, rmtDir, fileData)
-				if err != nil {
-					logr.Error(err)
-				}
-				name := "450016002021051_" + cf.Pay_DATE_E + ".txt"
-				err = myftp.Myftp(user, password, host, port, name+".finish", rmtDir, []byte{})
 				if err != nil {
 					logr.Error(err)
 				}
@@ -365,7 +350,7 @@ func (cf *ShijiazhuangZJFile) geneFile() string {
 	cd, ok := cf.GetInsIdCd()
 	if ok {
 		//cf.FileName = "YSFPOS_" + cd
-		cf.FileName = "450016002021051" //中间业务编码
+		cf.FileName = cd //中间业务编码
 	} else {
 		return ""
 	}
@@ -391,10 +376,10 @@ func (cf *ShijiazhuangZJFile) InitMCHTCd(mc string) gerror.IError {
 		return gerror.NewR(1000, err, "商户[%s]对账信息查询失败:%s", mc, err)
 	}
 	logr.Info("对账配置表:%+v\n", tbrec)
-	/*	if mc != "" {
+	if mc != "" {
 		cf.Ins_id_cd = append(cf.Ins_id_cd, mc)
 		cf.MCHT_TP[mc] = tbrec.Mcht_ty
-	}*/
+	}
 	if strings.ContainsAny(tbrec.EXT3, "[]") {
 		tbrec.EXT3 = strings.Trim(tbrec.EXT3, "[]")
 		v := strings.Split(tbrec.EXT3, ",")
@@ -435,12 +420,6 @@ func (cf *ShijiazhuangZJFile) InitMCHTCd(mc string) gerror.IError {
 		logr.Infof("商户[%s]假期[%s-%s][%s]合并,划付日期为:%v", mc, cf.Pay_DATE_S, cf.STLM_DATE, th.HOLIDAY_DSP, cf.Pay_DATE_E)
 	}
 
-	//logr.Info("初始化商户号:", cf.MCHT_TP)
-	for _, c := range strings.Split(tbrec.EXT4, ",") {
-		cf.Ins_id_cd = append(cf.Ins_id_cd, c)
-
-	}
-	cf.MCHT_TP = tbrec.Mcht_ty
-	logr.Infof("初始化商户号:[%+v][%s]", cf.Ins_id_cd, cf.MCHT_TP)
+	logr.Info("初始化商户号:", cf.MCHT_TP)
 	return nil
 }

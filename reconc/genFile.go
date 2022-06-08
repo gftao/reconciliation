@@ -84,6 +84,8 @@ func (g *GenFile) Run() {
 					g.Action = &SHKJGFile{}*/
 		case "15": //济南住建局
 			g.Action = &JinanZJFile{}
+		case "16": //贵阳二手房
+			g.Action = &GYESFile{}
 		default:
 			g.Action = &CrtFile{}
 		}

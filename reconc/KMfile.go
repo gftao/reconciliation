@@ -374,7 +374,8 @@ func (cf *KunmingZJFile) geneFile() string {
 	}
 
 	//cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + "摘要" + ".txt"
-	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + ".txt"
+	//cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + ".txt"
+	cf.FileName = cf.FileName + "_" + cf.Pay_DATE_E + "_" + cf.Area_cd + ".txt"
 	logr.Info("生成对账文件名称：", cf.FileName)
 	p := cf.FilePath + cf.FileName
 	return p
